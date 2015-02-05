@@ -29,4 +29,5 @@ node_modules
 
 # Project
 .idea
+*.iml
 .DS_Store
