@@ -4,6 +4,13 @@ var source = require('vinyl-source-stream');
 var reactify = require('reactify');
 var watchify = require('watchify');
 var livereload = require('gulp-livereload');
+var less = require('gulp-less');
+
+gulp.task('less', function () {
+  gulp.src('public/stylesheets/main.less')
+    .pipe(less())
+    .pipe(gulp.dest('public/stylesheets'));
+});
 
 gulp.task('default', function() {
   return scripts(false);
