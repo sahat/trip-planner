@@ -15,7 +15,7 @@ gulp.task('watch', function() {
 
 function scripts(watch) {
   var bundler, rebundle;
-  bundler = browserify('./react/main.js', {
+  bundler = browserify('./src/main.js', {
     debug: true,
     cache: {},
     packageCache: {},
@@ -26,7 +26,9 @@ function scripts(watch) {
     bundler = watchify(bundler)
   }
 
-  bundler.transform(reactify);
+  bundler.transform(function(file) {
+    return reactify(file, { es6: true });
+  });
 
   rebundle = function() {
     return bundler.bundle()
