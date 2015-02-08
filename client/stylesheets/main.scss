@@ -11,6 +11,8 @@ body {
   line-height: 1.42857143;
   color: #333;
   background-color: #fff;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale
 }
 
 #container {
@@ -28,8 +30,7 @@ body {
 }
 
 .status span {
-  padding: 2px 10px;
-  font-weight: 500;
+  padding: 4px 14px;
   background-color: #f9edbe;
   border: 1px solid #f0c36d;
   border-radius: 2px;
