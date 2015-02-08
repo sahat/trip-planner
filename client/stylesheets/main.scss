@@ -1,3 +1,8 @@
+// TODO: bootstrap button group for type, options, current charge, passengers, speed
+// TODO: use real-time weather
+// TODO:
+
+@import 'normalize';
 
 html, body {
   height: 100%;
@@ -23,6 +28,12 @@ body {
   height: 100%;
 }
 
+.button {
+  cursor: pointer;
+  border: 1px solid transparent;
+  outline: none;
+}
+
 .status {
   text-align: center;
   position: relative;
@@ -30,9 +41,122 @@ body {
 }
 
 .status span {
+  font-weight: bold;
+  font-size: 13px;
   padding: 4px 14px;
   background-color: #f9edbe;
   border: 1px solid #f0c36d;
   border-radius: 2px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.directions-overlay {
+  position: absolute;
+  z-index: 1;
+  top: 15px;
+  left: 50px;
+  padding-right: 36px;
+  padding-bottom: 29px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3), 0 4px 15px -5px transparent;
+}
+
+.directions-overlay input {
+  display: block;
+  font-size: 14px;
+  line-height: 30px;
+  padding: 3px 10px;
+  padding-left: 35px;
+  outline: 0;
+  min-width: 285px;
+  border: 0;
+  background-color: #fff;
+}
+
+.directions-overlay input:focus ~ i {
+  color: #4e8ef7;
+  transition: all 0.2s cubic-bezier(0.52, 0, 0.48, 1);
+}
+
+.directions-overlay .start i,
+.directions-overlay .end i {
+  position: absolute;
+  padding-left: 10px;
+  margin-top: -27px;
+}
+
+.directions-overlay .swap {
+  cursor: pointer;
+  position: absolute;
+  right: 0;
+  font-size: 22px;
+  top: 0;
+  color: #fff;
+  border: 0;
+  background-color: #4e8ef7;
+  padding: 0 10px;
+  height: 72px;
+  line-height: 72px;
+}
+
+.directions-overlay .get-directions {
+  background: #1AC567;
+  font-weight: bold;
+  font-size: 12px;
+  position: absolute;
+  text-align: center;
+  width: 366px;
+  padding: 5px 10px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  outline: none;
+
+  &:hover,
+  &:focus {
+    color: #FFF;
+    text-decoration: none;
+  }
+
+  &:active,
+  &.active {
+    outline: 0;
+    background-image: none;
+    box-shadow: inset 0 3px 5px rgba(0,0,0,.125);
+  }
+}
+
+
+.directions-overlay hr {
+  position: absolute;
+  width: 285px;
+  height: 1px;
+  border: 0;
+  left: 35px;
+  padding-left: 10px;
+  background-color: rgba(0, 0, 0, 0.1);
+  margin: 0;
+}
+
+nav {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  z-index: 1;
+}
+
+nav ul {
+  margin: 0;
+  padding: 0;
+}
+
+nav ul li {
+  display: inline;
+}
+
+nav a {
+  text-decoration: none;
+  padding: 0 10px;
+  font-size: 13px;
+  color: #fff;
+  font-weight: bold;
+  text-shadow: 0px 0px 5px rgba(0, 0, 0, 0.6);
 }
