@@ -1,6 +1,11 @@
 var React = require('react');
+var Reflux = require('reflux');
+var AppStore = require('../stores/AppStore');
+var AppActions = require('../actions/AppActions');
 
 var Maps = React.createClass({
+
+  mixins: [Reflux.connect(AppStore)],
 
   propTypes: {
     currentPosition: React.PropTypes.object,
@@ -8,9 +13,19 @@ var Maps = React.createClass({
     zoom: React.PropTypes.number
   },
 
+  getInitialState() {
+    return {
+      superchargers: [],
+      currentPosition: { lat: 33.92142, lng: -118.32982 }
+    }
+  },
+
   componentDidMount() {
+    AppActions.getCurrentPosition();
+    AppActions.loadSuperchargers();
+
     var mapOptions = {
-      center: this.props.currentPosition,
+      center: this.state.currentPosition,
       zoom: this.props.zoom,
       disableDefaultUI: true,
       mapTypeControl: true,
@@ -30,13 +45,22 @@ var Maps = React.createClass({
 
     var map = new google.maps.Map(this.getDOMNode(), mapOptions);
 
-    this.setSuperchargerMarkers(map);
 
     this.setState({ map: map });
   },
 
+  componentWillUpdate(nextProps, nextState) {
+    if (nextState.currentPosition !== this.state.currentPosition) {
+      this.state.map.setCenter(nextState.currentPosition);
+    }
+
+    if (this.state.superchargers.length > 0) {
+      this.setSuperchargerMarkers(this.state.map);
+    }
+  },
+
   setSuperchargerMarkers(map) {
-    for (var sc of this.props.superchargers) {
+    for (var sc of this.state.superchargers) {
       var marker = new google.maps.Marker({
         position: new google.maps.LatLng(sc.latitude, sc.longitude),
         icon: {
