@@ -181,10 +181,10 @@ module.exports = [
   },
 
   {
-    location: 'LA',
+    location: 'Los Angeles',
     address: '3203 Jack Northrop Ave, Hawthorne, CA 90250 - I-105 Exit 5 - SpaceX - Near Hawthorne Municipal Airport',
     latitude: 33.92142,
-    longitude: 118.32982,
+    longitude: -118.32982,
     state: 'CA',
     country: 'United States',
     slots: 6,
