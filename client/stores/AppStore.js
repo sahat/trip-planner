@@ -6,20 +6,20 @@ var AppStore = Reflux.createStore({
 
   listenables: [AppActions],
 
-  //init: function() {
-  //  console.log('store init');
-  //  this.listenTo(AppActions.loadSuperchargers, this.loadSuperchargers);
-  //},
-
-  getInitialState: function() {
-    this.superchargers = [];
-    return this.superchargers;
+  loadSuperchargers() {
+    request.get('http://localhost:5000/superchargers', function(res) {
+      var superchargers = JSON.parse(res.text);
+      this.trigger({ superchargers: superchargers });
+    }.bind(this));
   },
 
-  loadSuperchargers: function() {
-    request.get('http://localhost:5000/superchargers', function(res) {
-      this.superchargers = JSON.parse(res.text);
-      this.trigger(this.superchargers);
+  getCurrentPosition() {
+    navigator.geolocation.getCurrentPosition(function(position) {
+      var pos = {
+        lat: position.coords.latitude,
+        lng: position.coords.longitude
+      };
+      this.trigger({ currentPosition: pos });
     }.bind(this));
   }
 });
