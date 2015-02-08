@@ -17,18 +17,48 @@ AppActions.loadSuperchargers.preEmit = function() {
   console.log('fired sc fetch action')
 };
 
+AppActions.getCurrentPosition.listen(function() {
+  console.log(this.completed());
+});
+
 module.exports = AppActions;
 
 },{"reflux":"/Users/sahat/Projects/trip-planner/node_modules/reflux/index.js","superagent":"/Users/sahat/Projects/trip-planner/node_modules/superagent/lib/client.js"}],"/Users/sahat/Projects/trip-planner/client/components/App.jsx":[function(require,module,exports){
 var React = require('react');
 var Reflux = require('reflux');
-var AppStore = require('../stores/AppStore');
-var AppActions = require('../actions/AppActions');
 var Maps = require('./Maps.jsx');
 
 var App = React.createClass({displayName: "App",
 
+  render:function() {
+    return (
+      React.createElement("div", {id: "container"}, 
+        React.createElement("h1", null, "Tesla Trip Planner"), 
+        "Text placeholder", 
+        React.createElement(Maps, {zoom: 10})
+      )
+    );
+  }
+
+});
+
+module.exports = App;
+
+},{"./Maps.jsx":"/Users/sahat/Projects/trip-planner/client/components/Maps.jsx","react":"/Users/sahat/Projects/trip-planner/node_modules/react/react.js","reflux":"/Users/sahat/Projects/trip-planner/node_modules/reflux/index.js"}],"/Users/sahat/Projects/trip-planner/client/components/Maps.jsx":[function(require,module,exports){
+var React = require('react');
+var Reflux = require('reflux');
+var AppStore = require('../stores/AppStore');
+var AppActions = require('../actions/AppActions');
+
+var Maps = React.createClass({displayName: "Maps",
+
   mixins: [Reflux.connect(AppStore)],
+
+  propTypes: {
+    currentPosition: React.PropTypes.object,
+    superchargers: React.PropTypes.array,
+    zoom: React.PropTypes.number
+  },
 
   getInitialState:function() {
     return {
@@ -40,50 +70,9 @@ var App = React.createClass({displayName: "App",
   componentDidMount:function() {
     AppActions.getCurrentPosition();
     AppActions.loadSuperchargers();
-  },
 
-  getCurrentPosition:function() {
-    navigator.geolocation.getCurrentPosition(function(position) {
-      return {
-        lat: position.coords.latitude,
-        lng: position.coords.longitude
-      }
-    });
-  },
-
-  render:function() {
-    if (this.state.superchargers.length === 0) {
-      return null;
-    }
-    return (
-      React.createElement("div", {id: "container"}, 
-        React.createElement("h1", null, "Tesla Trip Planner"), 
-        "Text placeholder", 
-        React.createElement(Maps, {
-          superchargers: this.state.superchargers, 
-          currentPosition: this.state.currentPosition, 
-          zoom: 10})
-      )
-    );
-  }
-});
-
-module.exports = App;
-
-},{"../actions/AppActions":"/Users/sahat/Projects/trip-planner/client/actions/AppActions.js","../stores/AppStore":"/Users/sahat/Projects/trip-planner/client/stores/AppStore.js","./Maps.jsx":"/Users/sahat/Projects/trip-planner/client/components/Maps.jsx","react":"/Users/sahat/Projects/trip-planner/node_modules/react/react.js","reflux":"/Users/sahat/Projects/trip-planner/node_modules/reflux/index.js"}],"/Users/sahat/Projects/trip-planner/client/components/Maps.jsx":[function(require,module,exports){
-var React = require('react');
-
-var Maps = React.createClass({displayName: "Maps",
-
-  propTypes: {
-    currentPosition: React.PropTypes.object,
-    superchargers: React.PropTypes.array,
-    zoom: React.PropTypes.number
-  },
-
-  componentDidMount:function() {
     var mapOptions = {
-      center: this.props.currentPosition,
+      center: this.state.currentPosition,
       zoom: this.props.zoom,
       disableDefaultUI: true,
       mapTypeControl: true,
@@ -103,13 +92,22 @@ var Maps = React.createClass({displayName: "Maps",
 
     var map = new google.maps.Map(this.getDOMNode(), mapOptions);
 
-    this.setSuperchargerMarkers(map);
 
     this.setState({ map: map });
   },
 
+  componentWillUpdate:function(nextProps, nextState) {
+    if (nextState.currentPosition !== this.state.currentPosition) {
+      this.state.map.setCenter(nextState.currentPosition);
+    }
+
+    if (this.state.superchargers.length > 0) {
+      this.setSuperchargerMarkers(this.state.map);
+    }
+  },
+
   setSuperchargerMarkers:function(map) {
-    for (var sc of this.props.superchargers) {
+    for (var sc of this.state.superchargers) {
       var marker = new google.maps.Marker({
         position: new google.maps.LatLng(sc.latitude, sc.longitude),
         icon: {
@@ -131,14 +129,14 @@ var Maps = React.createClass({displayName: "Maps",
 
 module.exports = Maps;
 
-},{"react":"/Users/sahat/Projects/trip-planner/node_modules/react/react.js"}],"/Users/sahat/Projects/trip-planner/client/stores/AppStore.js":[function(require,module,exports){
+},{"../actions/AppActions":"/Users/sahat/Projects/trip-planner/client/actions/AppActions.js","../stores/AppStore":"/Users/sahat/Projects/trip-planner/client/stores/AppStore.js","react":"/Users/sahat/Projects/trip-planner/node_modules/react/react.js","reflux":"/Users/sahat/Projects/trip-planner/node_modules/reflux/index.js"}],"/Users/sahat/Projects/trip-planner/client/stores/AppStore.js":[function(require,module,exports){
 var request = require('superagent');
 var Reflux = require('reflux');
 var AppActions = require('../actions/AppActions');
 
 var AppStore = Reflux.createStore({
 
-  listenables: [AppActions],
+  listenables: AppActions,
 
   loadSuperchargers:function() {
     request.get('http://localhost:5000/superchargers', function(res) {

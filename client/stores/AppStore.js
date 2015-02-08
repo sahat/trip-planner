@@ -4,7 +4,7 @@ var AppActions = require('../actions/AppActions');
 
 var AppStore = Reflux.createStore({
 
-  listenables: [AppActions],
+  listenables: AppActions,
 
   loadSuperchargers() {
     request.get('http://localhost:5000/superchargers', function(res) {
