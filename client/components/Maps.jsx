@@ -28,14 +28,6 @@ var Maps = React.createClass({
       center: this.state.currentPosition,
       zoom: this.props.zoom,
       disableDefaultUI: true,
-      mapTypeControl: true,
-      mapTypeControlOptions: {
-        style: google.maps.MapTypeControlStyle.DEFAULT,
-        mapTypeIds: [
-          google.maps.MapTypeId.ROADMAP,
-          google.maps.MapTypeId.TERRAIN
-        ]
-      },
       zoomControl: true,
       zoomControlOptions: {
         style: google.maps.ZoomControlStyle.SMALL

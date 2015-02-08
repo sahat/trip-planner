@@ -17,24 +17,27 @@ AppActions.loadSuperchargers.preEmit = function() {
   console.log('fired sc fetch action')
 };
 
-AppActions.getCurrentPosition.listen(function() {
-  console.log(this.completed());
-});
-
 module.exports = AppActions;
 
 },{"reflux":"/Users/sahat/Projects/trip-planner/node_modules/reflux/index.js","superagent":"/Users/sahat/Projects/trip-planner/node_modules/superagent/lib/client.js"}],"/Users/sahat/Projects/trip-planner/client/components/App.jsx":[function(require,module,exports){
 var React = require('react');
 var Reflux = require('reflux');
 var Maps = require('./Maps.jsx');
+var Directions = require('./Directions.jsx');
 
 var App = React.createClass({displayName: "App",
 
   render:function() {
     return (
       React.createElement("div", {id: "container"}, 
-        React.createElement("h1", null, "Tesla Trip Planner"), 
-        "Text placeholder", 
+        React.createElement("nav", null, 
+          React.createElement("ul", null, 
+            React.createElement("li", null, React.createElement("a", {href: ""}, "Options")), 
+            React.createElement("li", null, React.createElement("a", {href: ""}, "Feedback")), 
+            React.createElement("li", null, React.createElement("a", {href: ""}, "Login"))
+          )
+        ), 
+        React.createElement(Directions, null), 
         React.createElement(Maps, {zoom: 10})
       )
     );
@@ -44,7 +47,43 @@ var App = React.createClass({displayName: "App",
 
 module.exports = App;
 
-},{"./Maps.jsx":"/Users/sahat/Projects/trip-planner/client/components/Maps.jsx","react":"/Users/sahat/Projects/trip-planner/node_modules/react/react.js","reflux":"/Users/sahat/Projects/trip-planner/node_modules/reflux/index.js"}],"/Users/sahat/Projects/trip-planner/client/components/Maps.jsx":[function(require,module,exports){
+},{"./Directions.jsx":"/Users/sahat/Projects/trip-planner/client/components/Directions.jsx","./Maps.jsx":"/Users/sahat/Projects/trip-planner/client/components/Maps.jsx","react":"/Users/sahat/Projects/trip-planner/node_modules/react/react.js","reflux":"/Users/sahat/Projects/trip-planner/node_modules/reflux/index.js"}],"/Users/sahat/Projects/trip-planner/client/components/Directions.jsx":[function(require,module,exports){
+var React = require('react');
+var Reflux = require('reflux');
+var AppStore = require('../stores/AppStore');
+var AppActions = require('../actions/AppActions');
+
+var Directions = React.createClass({displayName: "Directions",
+
+  render:function() {
+    return (
+
+
+      React.createElement("div", {className: "directions-overlay"}, 
+        React.createElement("div", {className: "directions"}, 
+          React.createElement("div", {className: "start"}, 
+            React.createElement("input", {type: "text", className: "start", placeholder: "Start"}), 
+            React.createElement("i", {className: "ion-pinpoint"})
+          ), 
+          React.createElement("hr", null), 
+          React.createElement("div", {className: "start"}, 
+            React.createElement("input", {type: "text", placeholder: "End"}), 
+            React.createElement("i", {className: "ion-model-s"})
+          )
+        ), 
+        React.createElement("button", {className: "swap"}, 
+          React.createElement("i", {className: "ion-android-send"})
+        ), 
+        React.createElement("button", {className: "get-directions"}, "Type, Options, Current Charge")
+      )
+    );
+  }
+
+});
+
+module.exports = Directions;
+
+},{"../actions/AppActions":"/Users/sahat/Projects/trip-planner/client/actions/AppActions.js","../stores/AppStore":"/Users/sahat/Projects/trip-planner/client/stores/AppStore.js","react":"/Users/sahat/Projects/trip-planner/node_modules/react/react.js","reflux":"/Users/sahat/Projects/trip-planner/node_modules/reflux/index.js"}],"/Users/sahat/Projects/trip-planner/client/components/Maps.jsx":[function(require,module,exports){
 var React = require('react');
 var Reflux = require('reflux');
 var AppStore = require('../stores/AppStore');
@@ -75,14 +114,6 @@ var Maps = React.createClass({displayName: "Maps",
       center: this.state.currentPosition,
       zoom: this.props.zoom,
       disableDefaultUI: true,
-      mapTypeControl: true,
-      mapTypeControlOptions: {
-        style: google.maps.MapTypeControlStyle.DEFAULT,
-        mapTypeIds: [
-          google.maps.MapTypeId.ROADMAP,
-          google.maps.MapTypeId.TERRAIN
-        ]
-      },
       zoomControl: true,
       zoomControlOptions: {
         style: google.maps.ZoomControlStyle.SMALL
