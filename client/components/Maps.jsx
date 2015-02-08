@@ -3,15 +3,15 @@ var React = require('react');
 var Maps = React.createClass({
 
   propTypes: {
-    latitude: React.PropTypes.number,
-    longitude: React.PropTypes.number,
+    currentPosition: React.PropTypes.object,
+    superchargers: React.PropTypes.array,
     zoom: React.PropTypes.number
   },
 
-  componentDidMount: function() {
+  componentDidMount() {
     var mapOptions = {
-      center: { lat: this.props.latitude, lng: this.props.longitude },
-      zoom: 10,
+      center: this.props.currentPosition,
+      zoom: this.props.zoom,
       disableDefaultUI: true,
       mapTypeControl: true,
       mapTypeControlOptions: {
@@ -35,26 +35,22 @@ var Maps = React.createClass({
     this.setState({ map: map });
   },
 
-  setSuperchargerMarkers: function(map, locations) {
-    var myLatLng = new google.maps.LatLng(37.4158798,-122.0244115);
-    console.log(myLatLng);
-
-    var marker = new google.maps.Marker({
-      position: myLatLng,
-      icon: {
-        url: '../img/icon-supercharger@2x.png',
-        scaledSize: new google.maps.Size(23, 33)
-      } ,
-      map: map,
-      title: 'Hello World',
-      animation: google.maps.Animation.DROP
-    });
+  setSuperchargerMarkers(map) {
+    for (var sc of this.props.superchargers) {
+      var marker = new google.maps.Marker({
+        position: new google.maps.LatLng(sc.latitude, sc.longitude),
+        icon: {
+          url: '../img/icon-supercharger@2x.png',
+          scaledSize: new google.maps.Size(23, 33)
+        },
+        map: map,
+        title: sc.location,
+        animation: google.maps.Animation.DROP
+      });
+    }
   },
 
-  componentDidUpdate: function() {
-  },
-
-  render: function() {
+  render() {
     return <div className='map'></div>;
   }
 
