@@ -6,13 +6,18 @@ var Maps = require('./Maps.jsx');
 
 var App = React.createClass({
 
-  mixins: [Reflux.connect(AppStore, 'superchargers')],
+  mixins: [Reflux.connect(AppStore)],
 
-  componentDidMount() {
-    AppActions.loadSuperchargers();
+  getInitialState() {
+    return {
+      superchargers: [],
+      currentPosition: { lat: 33.92142, lng: -118.32982 }
+    }
   },
 
-  componentDidUpdate() {
+  componentDidMount() {
+    AppActions.getCurrentPosition();
+    AppActions.loadSuperchargers();
   },
 
   render() {
@@ -21,12 +26,11 @@ var App = React.createClass({
     }
     return (
       <div id='container'>
-        <h1>sss exampless...qweqsadsweqw.</h1>
-        But s  sssaid go awaywsdadsqw
+        <h1>Tesla Trip Planner</h1>
+        Text placeholder
         <Maps
           superchargers={this.state.superchargers}
-          latitude={37.4190421}
-          longitude={-122.0254977}
+          currentPosition={this.state.currentPosition}
           zoom={10} />
       </div>
     );

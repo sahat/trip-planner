@@ -4,20 +4,65 @@ var App = require('./components/App.jsx');
 
 React.render(React.createElement(App, null), document.body);
 
-},{"./components/App.jsx":"/Users/sahat/Projects/trip-planner/client/components/App.jsx","react":"/Users/sahat/Projects/trip-planner/node_modules/react/react.js"}],"/Users/sahat/Projects/trip-planner/client/components/App.jsx":[function(require,module,exports){
+},{"./components/App.jsx":"/Users/sahat/Projects/trip-planner/client/components/App.jsx","react":"/Users/sahat/Projects/trip-planner/node_modules/react/react.js"}],"/Users/sahat/Projects/trip-planner/client/actions/AppActions.js":[function(require,module,exports){
+var Reflux = require('reflux');
+var request = require('superagent');
+
+var AppActions = Reflux.createActions({
+  loadSuperchargers: { asyncResult: true },
+  getCurrentPosition: { asyncResult: true }
+});
+
+AppActions.loadSuperchargers.preEmit = function() {
+  console.log('fired sc fetch action')
+};
+
+module.exports = AppActions;
+
+},{"reflux":"/Users/sahat/Projects/trip-planner/node_modules/reflux/index.js","superagent":"/Users/sahat/Projects/trip-planner/node_modules/superagent/lib/client.js"}],"/Users/sahat/Projects/trip-planner/client/components/App.jsx":[function(require,module,exports){
 var React = require('react');
+var Reflux = require('reflux');
+var AppStore = require('../stores/AppStore');
+var AppActions = require('../actions/AppActions');
 var Maps = require('./Maps.jsx');
 
 var App = React.createClass({displayName: "App",
-  render: function() {
+
+  mixins: [Reflux.connect(AppStore)],
+
+  getInitialState:function() {
+    return {
+      superchargers: [],
+      currentPosition: { lat: 33.92142, lng: -118.32982 }
+    }
+  },
+
+  componentDidMount:function() {
+    AppActions.getCurrentPosition();
+    AppActions.loadSuperchargers();
+  },
+
+  getCurrentPosition:function() {
+    navigator.geolocation.getCurrentPosition(function(position) {
+      return {
+        lat: position.coords.latitude,
+        lng: position.coords.longitude
+      }
+    });
+  },
+
+  render:function() {
+    if (this.state.superchargers.length === 0) {
+      return null;
+    }
     return (
       React.createElement("div", {id: "container"}, 
-        React.createElement("h1", null, "sss examples...qweqsadsweqw."), 
-        "But s  sssaid go awaywsdadsqw", 
+        React.createElement("h1", null, "Tesla Trip Planner"), 
+        "Text placeholder", 
         React.createElement(Maps, {
-          latitude: 37.4190421, 
-          longitude: -122.0254977, 
-          zoom: 16})
+          superchargers: this.state.superchargers, 
+          currentPosition: this.state.currentPosition, 
+          zoom: 10})
       )
     );
   }
@@ -25,21 +70,21 @@ var App = React.createClass({displayName: "App",
 
 module.exports = App;
 
-},{"./Maps.jsx":"/Users/sahat/Projects/trip-planner/client/components/Maps.jsx","react":"/Users/sahat/Projects/trip-planner/node_modules/react/react.js"}],"/Users/sahat/Projects/trip-planner/client/components/Maps.jsx":[function(require,module,exports){
+},{"../actions/AppActions":"/Users/sahat/Projects/trip-planner/client/actions/AppActions.js","../stores/AppStore":"/Users/sahat/Projects/trip-planner/client/stores/AppStore.js","./Maps.jsx":"/Users/sahat/Projects/trip-planner/client/components/Maps.jsx","react":"/Users/sahat/Projects/trip-planner/node_modules/react/react.js","reflux":"/Users/sahat/Projects/trip-planner/node_modules/reflux/index.js"}],"/Users/sahat/Projects/trip-planner/client/components/Maps.jsx":[function(require,module,exports){
 var React = require('react');
 
 var Maps = React.createClass({displayName: "Maps",
 
   propTypes: {
-    latitude: React.PropTypes.number,
-    longitude: React.PropTypes.number,
+    currentPosition: React.PropTypes.object,
+    superchargers: React.PropTypes.array,
     zoom: React.PropTypes.number
   },
 
-  componentDidMount: function() {
+  componentDidMount:function() {
     var mapOptions = {
-      center: { lat: this.props.latitude, lng: this.props.longitude },
-      zoom: 10,
+      center: this.props.currentPosition,
+      zoom: this.props.zoom,
       disableDefaultUI: true,
       mapTypeControl: true,
       mapTypeControlOptions: {
@@ -63,26 +108,22 @@ var Maps = React.createClass({displayName: "Maps",
     this.setState({ map: map });
   },
 
-  setSuperchargerMarkers: function(map, locations) {
-    var myLatLng = new google.maps.LatLng(37.4158798,-122.0244115);
-    console.log(myLatLng);
-
-    var marker = new google.maps.Marker({
-      position: myLatLng,
-      icon: {
-        url: '../img/icon-supercharger@2x.png',
-        scaledSize: new google.maps.Size(23, 33)
-      } ,
-      map: map,
-      title: 'Hello World',
-      animation: google.maps.Animation.DROP
-    });
+  setSuperchargerMarkers:function(map) {
+    for (var sc of this.props.superchargers) {
+      var marker = new google.maps.Marker({
+        position: new google.maps.LatLng(sc.latitude, sc.longitude),
+        icon: {
+          url: '../img/icon-supercharger@2x.png',
+          scaledSize: new google.maps.Size(23, 33)
+        },
+        map: map,
+        title: sc.location,
+        animation: google.maps.Animation.DROP
+      });
+    }
   },
 
-  componentDidUpdate: function() {
-  },
-
-  render: function() {
+  render:function() {
     return React.createElement("div", {className: "map"});
   }
 
@@ -90,7 +131,36 @@ var Maps = React.createClass({displayName: "Maps",
 
 module.exports = Maps;
 
-},{"react":"/Users/sahat/Projects/trip-planner/node_modules/react/react.js"}],"/Users/sahat/Projects/trip-planner/node_modules/browserify/node_modules/process/browser.js":[function(require,module,exports){
+},{"react":"/Users/sahat/Projects/trip-planner/node_modules/react/react.js"}],"/Users/sahat/Projects/trip-planner/client/stores/AppStore.js":[function(require,module,exports){
+var request = require('superagent');
+var Reflux = require('reflux');
+var AppActions = require('../actions/AppActions');
+
+var AppStore = Reflux.createStore({
+
+  listenables: [AppActions],
+
+  loadSuperchargers:function() {
+    request.get('http://localhost:5000/superchargers', function(res) {
+      var superchargers = JSON.parse(res.text);
+      this.trigger({ superchargers: superchargers });
+    }.bind(this));
+  },
+
+  getCurrentPosition:function() {
+    navigator.geolocation.getCurrentPosition(function(position) {
+      var pos = {
+        lat: position.coords.latitude,
+        lng: position.coords.longitude
+      };
+      this.trigger({ currentPosition: pos });
+    }.bind(this));
+  }
+});
+
+module.exports = AppStore;
+
+},{"../actions/AppActions":"/Users/sahat/Projects/trip-planner/client/actions/AppActions.js","reflux":"/Users/sahat/Projects/trip-planner/node_modules/reflux/index.js","superagent":"/Users/sahat/Projects/trip-planner/node_modules/superagent/lib/client.js"}],"/Users/sahat/Projects/trip-planner/node_modules/browserify/node_modules/process/browser.js":[function(require,module,exports){
 // shim for using process in browser
 
 var process = module.exports = {};
@@ -162,7 +232,7 @@ process.umask = function() { return 0; };
  * @typechecks static-only
  */
 
-"use strict";
+'use strict';
 
 var focusNode = require("./focusNode");
 
@@ -189,19 +259,48 @@ module.exports = AutoFocusMixin;
  * @typechecks static-only
  */
 
-"use strict";
+'use strict';
 
 var EventConstants = require("./EventConstants");
 var EventPropagators = require("./EventPropagators");
 var ExecutionEnvironment = require("./ExecutionEnvironment");
+var FallbackCompositionState = require("./FallbackCompositionState");
+var SyntheticCompositionEvent = require("./SyntheticCompositionEvent");
 var SyntheticInputEvent = require("./SyntheticInputEvent");
 
 var keyOf = require("./keyOf");
 
+var END_KEYCODES = [9, 13, 27, 32]; // Tab, Return, Esc, Space
+var START_KEYCODE = 229;
+
+var canUseCompositionEvent = (
+  ExecutionEnvironment.canUseDOM &&
+  'CompositionEvent' in window
+);
+
+var documentMode = null;
+if (ExecutionEnvironment.canUseDOM && 'documentMode' in document) {
+  documentMode = document.documentMode;
+}
+
+// Webkit offers a very useful `textInput` event that can be used to
+// directly represent `beforeInput`. The IE `textinput` event is not as
+// useful, so we don't use it.
 var canUseTextInputEvent = (
   ExecutionEnvironment.canUseDOM &&
   'TextEvent' in window &&
-  !('documentMode' in document || isPresto())
+  !documentMode &&
+  !isPresto()
+);
+
+// In IE9+, we have access to composition events, but the data supplied
+// by the native compositionend event may be incorrect. Japanese ideographic
+// spaces, for instance (\u3000) are not recorded correctly.
+var useFallbackCompositionData = (
+  ExecutionEnvironment.canUseDOM &&
+  (
+    (!canUseCompositionEvent || documentMode && documentMode > 8 && documentMode <= 11)
+  )
 );
 
 /**
@@ -235,11 +334,53 @@ var eventTypes = {
       topLevelTypes.topTextInput,
       topLevelTypes.topPaste
     ]
+  },
+  compositionEnd: {
+    phasedRegistrationNames: {
+      bubbled: keyOf({onCompositionEnd: null}),
+      captured: keyOf({onCompositionEndCapture: null})
+    },
+    dependencies: [
+      topLevelTypes.topBlur,
+      topLevelTypes.topCompositionEnd,
+      topLevelTypes.topKeyDown,
+      topLevelTypes.topKeyPress,
+      topLevelTypes.topKeyUp,
+      topLevelTypes.topMouseDown
+    ]
+  },
+  compositionStart: {
+    phasedRegistrationNames: {
+      bubbled: keyOf({onCompositionStart: null}),
+      captured: keyOf({onCompositionStartCapture: null})
+    },
+    dependencies: [
+      topLevelTypes.topBlur,
+      topLevelTypes.topCompositionStart,
+      topLevelTypes.topKeyDown,
+      topLevelTypes.topKeyPress,
+      topLevelTypes.topKeyUp,
+      topLevelTypes.topMouseDown
+    ]
+  },
+  compositionUpdate: {
+    phasedRegistrationNames: {
+      bubbled: keyOf({onCompositionUpdate: null}),
+      captured: keyOf({onCompositionUpdateCapture: null})
+    },
+    dependencies: [
+      topLevelTypes.topBlur,
+      topLevelTypes.topCompositionUpdate,
+      topLevelTypes.topKeyDown,
+      topLevelTypes.topKeyPress,
+      topLevelTypes.topKeyUp,
+      topLevelTypes.topMouseDown
+    ]
   }
 };
 
 // Track characters inserted via keypress and composition events.
-var fallbackChars = null;
+var fallbackBeforeInputChars = null;
 
 // Track whether we've ever handled a keypress on the space key.
 var hasSpaceKeypress = false;
@@ -257,6 +398,298 @@ function isKeypressCommand(nativeEvent) {
   );
 }
 
+
+/**
+ * Translate native top level events into event types.
+ *
+ * @param {string} topLevelType
+ * @return {object}
+ */
+function getCompositionEventType(topLevelType) {
+  switch (topLevelType) {
+    case topLevelTypes.topCompositionStart:
+      return eventTypes.compositionStart;
+    case topLevelTypes.topCompositionEnd:
+      return eventTypes.compositionEnd;
+    case topLevelTypes.topCompositionUpdate:
+      return eventTypes.compositionUpdate;
+  }
+}
+
+/**
+ * Does our fallback best-guess model think this event signifies that
+ * composition has begun?
+ *
+ * @param {string} topLevelType
+ * @param {object} nativeEvent
+ * @return {boolean}
+ */
+function isFallbackCompositionStart(topLevelType, nativeEvent) {
+  return (
+    topLevelType === topLevelTypes.topKeyDown &&
+    nativeEvent.keyCode === START_KEYCODE
+  );
+}
+
+/**
+ * Does our fallback mode think that this event is the end of composition?
+ *
+ * @param {string} topLevelType
+ * @param {object} nativeEvent
+ * @return {boolean}
+ */
+function isFallbackCompositionEnd(topLevelType, nativeEvent) {
+  switch (topLevelType) {
+    case topLevelTypes.topKeyUp:
+      // Command keys insert or clear IME input.
+      return (END_KEYCODES.indexOf(nativeEvent.keyCode) !== -1);
+    case topLevelTypes.topKeyDown:
+      // Expect IME keyCode on each keydown. If we get any other
+      // code we must have exited earlier.
+      return (nativeEvent.keyCode !== START_KEYCODE);
+    case topLevelTypes.topKeyPress:
+    case topLevelTypes.topMouseDown:
+    case topLevelTypes.topBlur:
+      // Events are not possible without cancelling IME.
+      return true;
+    default:
+      return false;
+  }
+}
+
+/**
+ * Google Input Tools provides composition data via a CustomEvent,
+ * with the `data` property populated in the `detail` object. If this
+ * is available on the event object, use it. If not, this is a plain
+ * composition event and we have nothing special to extract.
+ *
+ * @param {object} nativeEvent
+ * @return {?string}
+ */
+function getDataFromCustomEvent(nativeEvent) {
+  var detail = nativeEvent.detail;
+  if (typeof detail === 'object' && 'data' in detail) {
+    return detail.data;
+  }
+  return null;
+}
+
+// Track the current IME composition fallback object, if any.
+var currentComposition = null;
+
+/**
+ * @param {string} topLevelType Record from `EventConstants`.
+ * @param {DOMEventTarget} topLevelTarget The listening component root node.
+ * @param {string} topLevelTargetID ID of `topLevelTarget`.
+ * @param {object} nativeEvent Native browser event.
+ * @return {?object} A SyntheticCompositionEvent.
+ */
+function extractCompositionEvent(
+  topLevelType,
+  topLevelTarget,
+  topLevelTargetID,
+  nativeEvent
+) {
+  var eventType;
+  var fallbackData;
+
+  if (canUseCompositionEvent) {
+    eventType = getCompositionEventType(topLevelType);
+  } else if (!currentComposition) {
+    if (isFallbackCompositionStart(topLevelType, nativeEvent)) {
+      eventType = eventTypes.compositionStart;
+    }
+  } else if (isFallbackCompositionEnd(topLevelType, nativeEvent)) {
+    eventType = eventTypes.compositionEnd;
+  }
+
+  if (!eventType) {
+    return null;
+  }
+
+  if (useFallbackCompositionData) {
+    // The current composition is stored statically and must not be
+    // overwritten while composition continues.
+    if (!currentComposition && eventType === eventTypes.compositionStart) {
+      currentComposition = FallbackCompositionState.getPooled(topLevelTarget);
+    } else if (eventType === eventTypes.compositionEnd) {
+      if (currentComposition) {
+        fallbackData = currentComposition.getData();
+      }
+    }
+  }
+
+  var event = SyntheticCompositionEvent.getPooled(
+    eventType,
+    topLevelTargetID,
+    nativeEvent
+  );
+
+  if (fallbackData) {
+    // Inject data generated from fallback path into the synthetic event.
+    // This matches the property of native CompositionEventInterface.
+    event.data = fallbackData;
+  } else {
+    var customData = getDataFromCustomEvent(nativeEvent);
+    if (customData !== null) {
+      event.data = customData;
+    }
+  }
+
+  EventPropagators.accumulateTwoPhaseDispatches(event);
+  return event;
+}
+
+/**
+ * @param {string} topLevelType Record from `EventConstants`.
+ * @param {object} nativeEvent Native browser event.
+ * @return {?string} The string corresponding to this `beforeInput` event.
+ */
+function getNativeBeforeInputChars(topLevelType, nativeEvent) {
+  switch (topLevelType) {
+    case topLevelTypes.topCompositionEnd:
+      return getDataFromCustomEvent(nativeEvent);
+    case topLevelTypes.topKeyPress:
+      /**
+       * If native `textInput` events are available, our goal is to make
+       * use of them. However, there is a special case: the spacebar key.
+       * In Webkit, preventing default on a spacebar `textInput` event
+       * cancels character insertion, but it *also* causes the browser
+       * to fall back to its default spacebar behavior of scrolling the
+       * page.
+       *
+       * Tracking at:
+       * https://code.google.com/p/chromium/issues/detail?id=355103
+       *
+       * To avoid this issue, use the keypress event as if no `textInput`
+       * event is available.
+       */
+      var which = nativeEvent.which;
+      if (which !== SPACEBAR_CODE) {
+        return null;
+      }
+
+      hasSpaceKeypress = true;
+      return SPACEBAR_CHAR;
+
+    case topLevelTypes.topTextInput:
+      // Record the characters to be added to the DOM.
+      var chars = nativeEvent.data;
+
+      // If it's a spacebar character, assume that we have already handled
+      // it at the keypress level and bail immediately. Android Chrome
+      // doesn't give us keycodes, so we need to blacklist it.
+      if (chars === SPACEBAR_CHAR && hasSpaceKeypress) {
+        return null;
+      }
+
+      return chars;
+
+    default:
+      // For other native event types, do nothing.
+      return null;
+  }
+}
+
+/**
+ * For browsers that do not provide the `textInput` event, extract the
+ * appropriate string to use for SyntheticInputEvent.
+ *
+ * @param {string} topLevelType Record from `EventConstants`.
+ * @param {object} nativeEvent Native browser event.
+ * @return {?string} The fallback string for this `beforeInput` event.
+ */
+function getFallbackBeforeInputChars(topLevelType, nativeEvent) {
+  // If we are currently composing (IME) and using a fallback to do so,
+  // try to extract the composed characters from the fallback object.
+  if (currentComposition) {
+    if (
+      topLevelType === topLevelTypes.topCompositionEnd ||
+      isFallbackCompositionEnd(topLevelType, nativeEvent)
+    ) {
+      var chars = currentComposition.getData();
+      FallbackCompositionState.release(currentComposition);
+      currentComposition = null;
+      return chars;
+    }
+    return null;
+  }
+
+  switch (topLevelType) {
+    case topLevelTypes.topPaste:
+      // If a paste event occurs after a keypress, throw out the input
+      // chars. Paste events should not lead to BeforeInput events.
+      return null;
+    case topLevelTypes.topKeyPress:
+      /**
+       * As of v27, Firefox may fire keypress events even when no character
+       * will be inserted. A few possibilities:
+       *
+       * - `which` is `0`. Arrow keys, Esc key, etc.
+       *
+       * - `which` is the pressed key code, but no char is available.
+       *   Ex: 'AltGr + d` in Polish. There is no modified character for
+       *   this key combination and no character is inserted into the
+       *   document, but FF fires the keypress for char code `100` anyway.
+       *   No `input` event will occur.
+       *
+       * - `which` is the pressed key code, but a command combination is
+       *   being used. Ex: `Cmd+C`. No character is inserted, and no
+       *   `input` event will occur.
+       */
+      if (nativeEvent.which && !isKeypressCommand(nativeEvent)) {
+        return String.fromCharCode(nativeEvent.which);
+      }
+      return null;
+    case topLevelTypes.topCompositionEnd:
+      return useFallbackCompositionData ? null : nativeEvent.data;
+    default:
+      return null;
+  }
+}
+
+/**
+ * Extract a SyntheticInputEvent for `beforeInput`, based on either native
+ * `textInput` or fallback behavior.
+ *
+ * @param {string} topLevelType Record from `EventConstants`.
+ * @param {DOMEventTarget} topLevelTarget The listening component root node.
+ * @param {string} topLevelTargetID ID of `topLevelTarget`.
+ * @param {object} nativeEvent Native browser event.
+ * @return {?object} A SyntheticInputEvent.
+ */
+function extractBeforeInputEvent(
+  topLevelType,
+  topLevelTarget,
+  topLevelTargetID,
+  nativeEvent
+) {
+  var chars;
+
+  if (canUseTextInputEvent) {
+    chars = getNativeBeforeInputChars(topLevelType, nativeEvent);
+  } else {
+    chars = getFallbackBeforeInputChars(topLevelType, nativeEvent);
+  }
+
+  // If no characters are being inserted, no BeforeInput event should
+  // be fired.
+  if (!chars) {
+    return null;
+  }
+
+  var event = SyntheticInputEvent.getPooled(
+    eventTypes.beforeInput,
+    topLevelTargetID,
+    nativeEvent
+  );
+
+  event.data = chars;
+  fallbackBeforeInputChars = null;
+  EventPropagators.accumulateTwoPhaseDispatches(event);
+  return event;
+}
+
 /**
  * Create an `onBeforeInput` event to match
  * http://www.w3.org/TR/2013/WD-DOM-Level-3-Events-20131105/#events-inputevents.
@@ -270,6 +703,10 @@ function isKeypressCommand(nativeEvent) {
  * actually been added, contrary to the spec. Thus, `textInput` is the best
  * available event to identify the characters that have actually been inserted
  * into the target node.
+ *
+ * This plugin is also responsible for emitting `composition` events, thus
+ * allowing us to share composition fallback code for both `beforeInput` and
+ * `composition` event types.
  */
 var BeforeInputEventPlugin = {
 
@@ -284,121 +721,31 @@ var BeforeInputEventPlugin = {
    * @see {EventPluginHub.extractEvents}
    */
   extractEvents: function(
-      topLevelType,
-      topLevelTarget,
-      topLevelTargetID,
-      nativeEvent) {
-
-    var chars;
-
-    if (canUseTextInputEvent) {
-      switch (topLevelType) {
-        case topLevelTypes.topKeyPress:
-          /**
-           * If native `textInput` events are available, our goal is to make
-           * use of them. However, there is a special case: the spacebar key.
-           * In Webkit, preventing default on a spacebar `textInput` event
-           * cancels character insertion, but it *also* causes the browser
-           * to fall back to its default spacebar behavior of scrolling the
-           * page.
-           *
-           * Tracking at:
-           * https://code.google.com/p/chromium/issues/detail?id=355103
-           *
-           * To avoid this issue, use the keypress event as if no `textInput`
-           * event is available.
-           */
-          var which = nativeEvent.which;
-          if (which !== SPACEBAR_CODE) {
-            return;
-          }
-
-          hasSpaceKeypress = true;
-          chars = SPACEBAR_CHAR;
-          break;
-
-        case topLevelTypes.topTextInput:
-          // Record the characters to be added to the DOM.
-          chars = nativeEvent.data;
-
-          // If it's a spacebar character, assume that we have already handled
-          // it at the keypress level and bail immediately. Android Chrome
-          // doesn't give us keycodes, so we need to blacklist it.
-          if (chars === SPACEBAR_CHAR && hasSpaceKeypress) {
-            return;
-          }
-
-          // Otherwise, carry on.
-          break;
-
-        default:
-          // For other native event types, do nothing.
-          return;
-      }
-    } else {
-      switch (topLevelType) {
-        case topLevelTypes.topPaste:
-          // If a paste event occurs after a keypress, throw out the input
-          // chars. Paste events should not lead to BeforeInput events.
-          fallbackChars = null;
-          break;
-        case topLevelTypes.topKeyPress:
-          /**
-           * As of v27, Firefox may fire keypress events even when no character
-           * will be inserted. A few possibilities:
-           *
-           * - `which` is `0`. Arrow keys, Esc key, etc.
-           *
-           * - `which` is the pressed key code, but no char is available.
-           *   Ex: 'AltGr + d` in Polish. There is no modified character for
-           *   this key combination and no character is inserted into the
-           *   document, but FF fires the keypress for char code `100` anyway.
-           *   No `input` event will occur.
-           *
-           * - `which` is the pressed key code, but a command combination is
-           *   being used. Ex: `Cmd+C`. No character is inserted, and no
-           *   `input` event will occur.
-           */
-          if (nativeEvent.which && !isKeypressCommand(nativeEvent)) {
-            fallbackChars = String.fromCharCode(nativeEvent.which);
-          }
-          break;
-        case topLevelTypes.topCompositionEnd:
-          fallbackChars = nativeEvent.data;
-          break;
-      }
-
-      // If no changes have occurred to the fallback string, no relevant
-      // event has fired and we're done.
-      if (fallbackChars === null) {
-        return;
-      }
-
-      chars = fallbackChars;
-    }
-
-    // If no characters are being inserted, no BeforeInput event should
-    // be fired.
-    if (!chars) {
-      return;
-    }
-
-    var event = SyntheticInputEvent.getPooled(
-      eventTypes.beforeInput,
-      topLevelTargetID,
-      nativeEvent
-    );
-
-    event.data = chars;
-    fallbackChars = null;
-    EventPropagators.accumulateTwoPhaseDispatches(event);
-    return event;
+    topLevelType,
+    topLevelTarget,
+    topLevelTargetID,
+    nativeEvent
+  ) {
+    return [
+      extractCompositionEvent(
+        topLevelType,
+        topLevelTarget,
+        topLevelTargetID,
+        nativeEvent
+      ),
+      extractBeforeInputEvent(
+        topLevelType,
+        topLevelTarget,
+        topLevelTargetID,
+        nativeEvent
+      )
+    ];
   }
 };
 
 module.exports = BeforeInputEventPlugin;
 
-},{"./EventConstants":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/EventConstants.js","./EventPropagators":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/EventPropagators.js","./ExecutionEnvironment":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ExecutionEnvironment.js","./SyntheticInputEvent":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/SyntheticInputEvent.js","./keyOf":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/keyOf.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/CSSProperty.js":[function(require,module,exports){
+},{"./EventConstants":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/EventConstants.js","./EventPropagators":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/EventPropagators.js","./ExecutionEnvironment":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ExecutionEnvironment.js","./FallbackCompositionState":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/FallbackCompositionState.js","./SyntheticCompositionEvent":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/SyntheticCompositionEvent.js","./SyntheticInputEvent":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/SyntheticInputEvent.js","./keyOf":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/keyOf.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/CSSProperty.js":[function(require,module,exports){
 /**
  * Copyright 2013-2014, Facebook, Inc.
  * All rights reserved.
@@ -410,7 +757,7 @@ module.exports = BeforeInputEventPlugin;
  * @providesModule CSSProperty
  */
 
-"use strict";
+'use strict';
 
 /**
  * CSS properties which accept numbers but are not in units of "px".
@@ -531,7 +878,7 @@ module.exports = CSSProperty;
  * @typechecks static-only
  */
 
-"use strict";
+'use strict';
 
 var CSSProperty = require("./CSSProperty");
 var ExecutionEnvironment = require("./ExecutionEnvironment");
@@ -555,7 +902,14 @@ if (ExecutionEnvironment.canUseDOM) {
 }
 
 if ("production" !== process.env.NODE_ENV) {
+  // 'msTransform' is correct, but the other prefixes should be capitalized
+  var badVendoredStyleNamePattern = /^(?:webkit|moz|o)[A-Z]/;
+
+  // style values shouldn't contain a semicolon
+  var badStyleValueWithSemicolonPattern = /;\s*$/;
+
   var warnedStyleNames = {};
+  var warnedStyleValues = {};
 
   var warnHyphenatedStyleName = function(name) {
     if (warnedStyleNames.hasOwnProperty(name) && warnedStyleNames[name]) {
@@ -565,9 +919,53 @@ if ("production" !== process.env.NODE_ENV) {
     warnedStyleNames[name] = true;
     ("production" !== process.env.NODE_ENV ? warning(
       false,
-      'Unsupported style property ' + name + '. Did you mean ' +
-      camelizeStyleName(name) + '?'
+      'Unsupported style property %s. Did you mean %s?',
+      name,
+      camelizeStyleName(name)
     ) : null);
+  };
+
+  var warnBadVendoredStyleName = function(name) {
+    if (warnedStyleNames.hasOwnProperty(name) && warnedStyleNames[name]) {
+      return;
+    }
+
+    warnedStyleNames[name] = true;
+    ("production" !== process.env.NODE_ENV ? warning(
+      false,
+      'Unsupported vendor-prefixed style property %s. Did you mean %s?',
+      name,
+      name.charAt(0).toUpperCase() + name.slice(1)
+    ) : null);
+  };
+
+  var warnStyleValueWithSemicolon = function(name, value) {
+    if (warnedStyleValues.hasOwnProperty(value) && warnedStyleValues[value]) {
+      return;
+    }
+
+    warnedStyleValues[value] = true;
+    ("production" !== process.env.NODE_ENV ? warning(
+      false,
+      'Style property values shouldn\'t contain a semicolon. ' +
+      'Try "%s: %s" instead.',
+      name,
+      value.replace(badStyleValueWithSemicolonPattern, '')
+    ) : null);
+  };
+
+  /**
+   * @param {string} name
+   * @param {*} value
+   */
+  var warnValidStyle = function(name, value) {
+    if (name.indexOf('-') > -1) {
+      warnHyphenatedStyleName(name);
+    } else if (badVendoredStyleNamePattern.test(name)) {
+      warnBadVendoredStyleName(name);
+    } else if (badStyleValueWithSemicolonPattern.test(value)) {
+      warnStyleValueWithSemicolon(name, value);
+    }
   };
 }
 
@@ -594,12 +992,10 @@ var CSSPropertyOperations = {
       if (!styles.hasOwnProperty(styleName)) {
         continue;
       }
-      if ("production" !== process.env.NODE_ENV) {
-        if (styleName.indexOf('-') > -1) {
-          warnHyphenatedStyleName(styleName);
-        }
-      }
       var styleValue = styles[styleName];
+      if ("production" !== process.env.NODE_ENV) {
+        warnValidStyle(styleName, styleValue);
+      }
       if (styleValue != null) {
         serialized += processStyleName(styleName) + ':';
         serialized += dangerousStyleValue(styleName, styleValue) + ';';
@@ -622,9 +1018,7 @@ var CSSPropertyOperations = {
         continue;
       }
       if ("production" !== process.env.NODE_ENV) {
-        if (styleName.indexOf('-') > -1) {
-          warnHyphenatedStyleName(styleName);
-        }
+        warnValidStyle(styleName, styles[styleName]);
       }
       var styleValue = dangerousStyleValue(styleName, styles[styleName]);
       if (styleName === 'float') {
@@ -665,7 +1059,7 @@ module.exports = CSSPropertyOperations;
  * @providesModule CallbackQueue
  */
 
-"use strict";
+'use strict';
 
 var PooledClass = require("./PooledClass");
 
@@ -716,7 +1110,7 @@ assign(CallbackQueue.prototype, {
     if (callbacks) {
       ("production" !== process.env.NODE_ENV ? invariant(
         callbacks.length === contexts.length,
-        "Mismatched list of contexts in callback queue"
+        'Mismatched list of contexts in callback queue'
       ) : invariant(callbacks.length === contexts.length));
       this._callbacks = null;
       this._contexts = null;
@@ -764,7 +1158,7 @@ module.exports = CallbackQueue;
  * @providesModule ChangeEventPlugin
  */
 
-"use strict";
+'use strict';
 
 var EventConstants = require("./EventConstants");
 var EventPluginHub = require("./EventPluginHub");
@@ -820,7 +1214,7 @@ var doesChangeEventBubble = false;
 if (ExecutionEnvironment.canUseDOM) {
   // See `handleChange` comment below
   doesChangeEventBubble = isEventSupported('change') && (
-    !('documentMode' in document) || document.documentMode > 8
+    (!('documentMode' in document) || document.documentMode > 8)
   );
 }
 
@@ -897,7 +1291,7 @@ if (ExecutionEnvironment.canUseDOM) {
   // IE9 claims to support the input event but fails to trigger it when
   // deleting text, so we ignore its input events
   isInputEventSupported = isEventSupported('input') && (
-    !('documentMode' in document) || document.documentMode > 9
+    (!('documentMode' in document) || document.documentMode > 9)
   );
 }
 
@@ -1147,7 +1541,7 @@ module.exports = ChangeEventPlugin;
  * @typechecks
  */
 
-"use strict";
+'use strict';
 
 var nextReactRootIndex = 0;
 
@@ -1159,266 +1553,7 @@ var ClientReactRootIndex = {
 
 module.exports = ClientReactRootIndex;
 
-},{}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/CompositionEventPlugin.js":[function(require,module,exports){
-/**
- * Copyright 2013-2014, Facebook, Inc.
- * All rights reserved.
- *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
- *
- * @providesModule CompositionEventPlugin
- * @typechecks static-only
- */
-
-"use strict";
-
-var EventConstants = require("./EventConstants");
-var EventPropagators = require("./EventPropagators");
-var ExecutionEnvironment = require("./ExecutionEnvironment");
-var ReactInputSelection = require("./ReactInputSelection");
-var SyntheticCompositionEvent = require("./SyntheticCompositionEvent");
-
-var getTextContentAccessor = require("./getTextContentAccessor");
-var keyOf = require("./keyOf");
-
-var END_KEYCODES = [9, 13, 27, 32]; // Tab, Return, Esc, Space
-var START_KEYCODE = 229;
-
-var useCompositionEvent = (
-  ExecutionEnvironment.canUseDOM &&
-  'CompositionEvent' in window
-);
-
-// In IE9+, we have access to composition events, but the data supplied
-// by the native compositionend event may be incorrect. In Korean, for example,
-// the compositionend event contains only one character regardless of
-// how many characters have been composed since compositionstart.
-// We therefore use the fallback data while still using the native
-// events as triggers.
-var useFallbackData = (
-  !useCompositionEvent ||
-  (
-    'documentMode' in document &&
-    document.documentMode > 8 &&
-    document.documentMode <= 11
-  )
-);
-
-var topLevelTypes = EventConstants.topLevelTypes;
-var currentComposition = null;
-
-// Events and their corresponding property names.
-var eventTypes = {
-  compositionEnd: {
-    phasedRegistrationNames: {
-      bubbled: keyOf({onCompositionEnd: null}),
-      captured: keyOf({onCompositionEndCapture: null})
-    },
-    dependencies: [
-      topLevelTypes.topBlur,
-      topLevelTypes.topCompositionEnd,
-      topLevelTypes.topKeyDown,
-      topLevelTypes.topKeyPress,
-      topLevelTypes.topKeyUp,
-      topLevelTypes.topMouseDown
-    ]
-  },
-  compositionStart: {
-    phasedRegistrationNames: {
-      bubbled: keyOf({onCompositionStart: null}),
-      captured: keyOf({onCompositionStartCapture: null})
-    },
-    dependencies: [
-      topLevelTypes.topBlur,
-      topLevelTypes.topCompositionStart,
-      topLevelTypes.topKeyDown,
-      topLevelTypes.topKeyPress,
-      topLevelTypes.topKeyUp,
-      topLevelTypes.topMouseDown
-    ]
-  },
-  compositionUpdate: {
-    phasedRegistrationNames: {
-      bubbled: keyOf({onCompositionUpdate: null}),
-      captured: keyOf({onCompositionUpdateCapture: null})
-    },
-    dependencies: [
-      topLevelTypes.topBlur,
-      topLevelTypes.topCompositionUpdate,
-      topLevelTypes.topKeyDown,
-      topLevelTypes.topKeyPress,
-      topLevelTypes.topKeyUp,
-      topLevelTypes.topMouseDown
-    ]
-  }
-};
-
-/**
- * Translate native top level events into event types.
- *
- * @param {string} topLevelType
- * @return {object}
- */
-function getCompositionEventType(topLevelType) {
-  switch (topLevelType) {
-    case topLevelTypes.topCompositionStart:
-      return eventTypes.compositionStart;
-    case topLevelTypes.topCompositionEnd:
-      return eventTypes.compositionEnd;
-    case topLevelTypes.topCompositionUpdate:
-      return eventTypes.compositionUpdate;
-  }
-}
-
-/**
- * Does our fallback best-guess model think this event signifies that
- * composition has begun?
- *
- * @param {string} topLevelType
- * @param {object} nativeEvent
- * @return {boolean}
- */
-function isFallbackStart(topLevelType, nativeEvent) {
-  return (
-    topLevelType === topLevelTypes.topKeyDown &&
-    nativeEvent.keyCode === START_KEYCODE
-  );
-}
-
-/**
- * Does our fallback mode think that this event is the end of composition?
- *
- * @param {string} topLevelType
- * @param {object} nativeEvent
- * @return {boolean}
- */
-function isFallbackEnd(topLevelType, nativeEvent) {
-  switch (topLevelType) {
-    case topLevelTypes.topKeyUp:
-      // Command keys insert or clear IME input.
-      return (END_KEYCODES.indexOf(nativeEvent.keyCode) !== -1);
-    case topLevelTypes.topKeyDown:
-      // Expect IME keyCode on each keydown. If we get any other
-      // code we must have exited earlier.
-      return (nativeEvent.keyCode !== START_KEYCODE);
-    case topLevelTypes.topKeyPress:
-    case topLevelTypes.topMouseDown:
-    case topLevelTypes.topBlur:
-      // Events are not possible without cancelling IME.
-      return true;
-    default:
-      return false;
-  }
-}
-
-/**
- * Helper class stores information about selection and document state
- * so we can figure out what changed at a later date.
- *
- * @param {DOMEventTarget} root
- */
-function FallbackCompositionState(root) {
-  this.root = root;
-  this.startSelection = ReactInputSelection.getSelection(root);
-  this.startValue = this.getText();
-}
-
-/**
- * Get current text of input.
- *
- * @return {string}
- */
-FallbackCompositionState.prototype.getText = function() {
-  return this.root.value || this.root[getTextContentAccessor()];
-};
-
-/**
- * Text that has changed since the start of composition.
- *
- * @return {string}
- */
-FallbackCompositionState.prototype.getData = function() {
-  var endValue = this.getText();
-  var prefixLength = this.startSelection.start;
-  var suffixLength = this.startValue.length - this.startSelection.end;
-
-  return endValue.substr(
-    prefixLength,
-    endValue.length - suffixLength - prefixLength
-  );
-};
-
-/**
- * This plugin creates `onCompositionStart`, `onCompositionUpdate` and
- * `onCompositionEnd` events on inputs, textareas and contentEditable
- * nodes.
- */
-var CompositionEventPlugin = {
-
-  eventTypes: eventTypes,
-
-  /**
-   * @param {string} topLevelType Record from `EventConstants`.
-   * @param {DOMEventTarget} topLevelTarget The listening component root node.
-   * @param {string} topLevelTargetID ID of `topLevelTarget`.
-   * @param {object} nativeEvent Native browser event.
-   * @return {*} An accumulation of synthetic events.
-   * @see {EventPluginHub.extractEvents}
-   */
-  extractEvents: function(
-      topLevelType,
-      topLevelTarget,
-      topLevelTargetID,
-      nativeEvent) {
-
-    var eventType;
-    var data;
-
-    if (useCompositionEvent) {
-      eventType = getCompositionEventType(topLevelType);
-    } else if (!currentComposition) {
-      if (isFallbackStart(topLevelType, nativeEvent)) {
-        eventType = eventTypes.compositionStart;
-      }
-    } else if (isFallbackEnd(topLevelType, nativeEvent)) {
-      eventType = eventTypes.compositionEnd;
-    }
-
-    if (useFallbackData) {
-      // The current composition is stored statically and must not be
-      // overwritten while composition continues.
-      if (!currentComposition && eventType === eventTypes.compositionStart) {
-        currentComposition = new FallbackCompositionState(topLevelTarget);
-      } else if (eventType === eventTypes.compositionEnd) {
-        if (currentComposition) {
-          data = currentComposition.getData();
-          currentComposition = null;
-        }
-      }
-    }
-
-    if (eventType) {
-      var event = SyntheticCompositionEvent.getPooled(
-        eventType,
-        topLevelTargetID,
-        nativeEvent
-      );
-      if (data) {
-        // Inject data generated from fallback path into the synthetic event.
-        // This matches the property of native CompositionEventInterface.
-        event.data = data;
-      }
-      EventPropagators.accumulateTwoPhaseDispatches(event);
-      return event;
-    }
-  }
-};
-
-module.exports = CompositionEventPlugin;
-
-},{"./EventConstants":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/EventConstants.js","./EventPropagators":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/EventPropagators.js","./ExecutionEnvironment":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ExecutionEnvironment.js","./ReactInputSelection":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactInputSelection.js","./SyntheticCompositionEvent":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/SyntheticCompositionEvent.js","./getTextContentAccessor":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/getTextContentAccessor.js","./keyOf":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/keyOf.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/DOMChildrenOperations.js":[function(require,module,exports){
+},{}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/DOMChildrenOperations.js":[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2014, Facebook, Inc.
@@ -1432,7 +1567,7 @@ module.exports = CompositionEventPlugin;
  * @typechecks static-only
  */
 
-"use strict";
+'use strict';
 
 var Danger = require("./Danger");
 var ReactMultiChildUpdateTypes = require("./ReactMultiChildUpdateTypes");
@@ -1522,7 +1657,8 @@ var DOMChildrenOperations = {
     // List of children that will be moved or removed.
     var updatedChildren = null;
 
-    for (var i = 0; update = updates[i]; i++) {
+    for (var i = 0; i < updates.length; i++) {
+      update = updates[i];
       if (update.type === ReactMultiChildUpdateTypes.MOVE_EXISTING ||
           update.type === ReactMultiChildUpdateTypes.REMOVE_NODE) {
         var updatedIndex = update.fromIndex;
@@ -1534,7 +1670,7 @@ var DOMChildrenOperations = {
           'processUpdates(): Unable to find child %s of element. This ' +
           'probably means the DOM was unexpectedly mutated (e.g., by the ' +
           'browser), usually due to forgetting a <tbody> when using tables, ' +
-          'nesting tags like <form>, <p>, or <a>, or using non-SVG elements '+
+          'nesting tags like <form>, <p>, or <a>, or using non-SVG elements ' +
           'in an <svg> parent. Try inspecting the child nodes of the element ' +
           'with React ID `%s`.',
           updatedIndex,
@@ -1559,7 +1695,8 @@ var DOMChildrenOperations = {
       }
     }
 
-    for (var k = 0; update = updates[k]; k++) {
+    for (var k = 0; k < updates.length; k++) {
+      update = updates[k];
       switch (update.type) {
         case ReactMultiChildUpdateTypes.INSERT_MARKUP:
           insertChildAt(
@@ -1609,7 +1746,7 @@ module.exports = DOMChildrenOperations;
 
 /*jslint bitwise: true */
 
-"use strict";
+'use strict';
 
 var invariant = require("./invariant");
 
@@ -1906,7 +2043,7 @@ module.exports = DOMProperty;
  * @typechecks static-only
  */
 
-"use strict";
+'use strict';
 
 var DOMProperty = require("./DOMProperty");
 
@@ -1957,7 +2094,9 @@ if ("production" !== process.env.NODE_ENV) {
     // logging too much when using transferPropsTo.
     ("production" !== process.env.NODE_ENV ? warning(
       standardName == null,
-      'Unknown DOM property ' + name + '. Did you mean ' + standardName + '?'
+      'Unknown DOM property %s. Did you mean %s?',
+      name,
+      standardName
     ) : null);
 
   };
@@ -2105,7 +2244,7 @@ module.exports = DOMPropertyOperations;
 
 /*jslint evil: true, sub: true */
 
-"use strict";
+'use strict';
 
 var ExecutionEnvironment = require("./ExecutionEnvironment");
 
@@ -2175,7 +2314,8 @@ var Danger = {
       // This for-in loop skips the holes of the sparse array. The order of
       // iteration should follow the order of assignment, which happens to match
       // numerical index order, but we don't rely on that.
-      for (var resultIndex in markupListByNodeName) {
+      var resultIndex;
+      for (resultIndex in markupListByNodeName) {
         if (markupListByNodeName.hasOwnProperty(resultIndex)) {
           var markup = markupListByNodeName[resultIndex];
 
@@ -2196,8 +2336,8 @@ var Danger = {
         emptyFunction // Do nothing special with <script> tags.
       );
 
-      for (i = 0; i < renderNodes.length; ++i) {
-        var renderNode = renderNodes[i];
+      for (var j = 0; j < renderNodes.length; ++j) {
+        var renderNode = renderNodes[j];
         if (renderNode.hasAttribute &&
             renderNode.hasAttribute(RESULT_INDEX_ATTR)) {
 
@@ -2217,7 +2357,7 @@ var Danger = {
 
         } else if ("production" !== process.env.NODE_ENV) {
           console.error(
-            "Danger: Discarding unexpected node:",
+            'Danger: Discarding unexpected node:',
             renderNode
           );
         }
@@ -2263,7 +2403,7 @@ var Danger = {
       'dangerouslyReplaceNodeWithMarkup(...): Cannot replace markup of the ' +
       '<html> node. This is because browser quirks make this unreliable ' +
       'and/or slow. If you want to render to the root you must use ' +
-      'server rendering. See renderComponentToString().'
+      'server rendering. See React.renderToString().'
     ) : invariant(oldChild.tagName.toLowerCase() !== 'html'));
 
     var newChild = createNodesFromMarkup(markup, emptyFunction)[0];
@@ -2287,7 +2427,7 @@ module.exports = Danger;
  * @providesModule DefaultEventPluginOrder
  */
 
-"use strict";
+'use strict';
 
  var keyOf = require("./keyOf");
 
@@ -2307,7 +2447,6 @@ var DefaultEventPluginOrder = [
   keyOf({EnterLeaveEventPlugin: null}),
   keyOf({ChangeEventPlugin: null}),
   keyOf({SelectEventPlugin: null}),
-  keyOf({CompositionEventPlugin: null}),
   keyOf({BeforeInputEventPlugin: null}),
   keyOf({AnalyticsEventPlugin: null}),
   keyOf({MobileSafariClickEventPlugin: null})
@@ -2328,7 +2467,7 @@ module.exports = DefaultEventPluginOrder;
  * @typechecks static-only
  */
 
-"use strict";
+'use strict';
 
 var EventConstants = require("./EventConstants");
 var EventPropagators = require("./EventPropagators");
@@ -2467,7 +2606,7 @@ module.exports = EnterLeaveEventPlugin;
  * @providesModule EventConstants
  */
 
-"use strict";
+'use strict';
 
 var keyMirror = require("./keyMirror");
 
@@ -2630,7 +2769,7 @@ module.exports = EventListener;
  * @providesModule EventPluginHub
  */
 
-"use strict";
+'use strict';
 
 var EventPluginRegistry = require("./EventPluginRegistry");
 var EventPluginUtils = require("./EventPluginUtils");
@@ -2679,12 +2818,14 @@ var executeDispatchesAndRelease = function(event) {
 var InstanceHandle = null;
 
 function validateInstanceHandle() {
-  var invalid = !InstanceHandle||
-    !InstanceHandle.traverseTwoPhase ||
-    !InstanceHandle.traverseEnterLeave;
-  if (invalid) {
-    throw new Error('InstanceHandle not injected before use!');
-  }
+  var valid =
+    InstanceHandle &&
+    InstanceHandle.traverseTwoPhase &&
+    InstanceHandle.traverseEnterLeave;
+  ("production" !== process.env.NODE_ENV ? invariant(
+    valid,
+    'InstanceHandle not injected before use!'
+  ) : invariant(valid));
 }
 
 /**
@@ -2907,7 +3048,7 @@ module.exports = EventPluginHub;
  * @typechecks static-only
  */
 
-"use strict";
+'use strict';
 
 var invariant = require("./invariant");
 
@@ -3186,7 +3327,7 @@ module.exports = EventPluginRegistry;
  * @providesModule EventPluginUtils
  */
 
-"use strict";
+'use strict';
 
 var EventConstants = require("./EventConstants");
 
@@ -3407,7 +3548,7 @@ module.exports = EventPluginUtils;
  * @providesModule EventPropagators
  */
 
-"use strict";
+'use strict';
 
 var EventConstants = require("./EventConstants");
 var EventPluginHub = require("./EventPluginHub");
@@ -3553,9 +3694,8 @@ module.exports = EventPropagators;
 "use strict";
 
 var canUseDOM = !!(
-  typeof window !== 'undefined' &&
-  window.document &&
-  window.document.createElement
+  (typeof window !== 'undefined' &&
+  window.document && window.document.createElement)
 );
 
 /**
@@ -3581,7 +3721,98 @@ var ExecutionEnvironment = {
 
 module.exports = ExecutionEnvironment;
 
-},{}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/HTMLDOMPropertyConfig.js":[function(require,module,exports){
+},{}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/FallbackCompositionState.js":[function(require,module,exports){
+/**
+ * Copyright 2013 Facebook, Inc.
+ * All rights reserved.
+ *
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
+ *
+ * @providesModule FallbackCompositionState
+ * @typechecks static-only
+ */
+
+'use strict';
+
+var PooledClass = require("./PooledClass");
+
+var assign = require("./Object.assign");
+var getTextContentAccessor = require("./getTextContentAccessor");
+
+/**
+ * This helper class stores information about text content of a target node,
+ * allowing comparison of content before and after a given event.
+ *
+ * Identify the node where selection currently begins, then observe
+ * both its text content and its current position in the DOM. Since the
+ * browser may natively replace the target node during composition, we can
+ * use its position to find its replacement.
+ *
+ * @param {DOMEventTarget} root
+ */
+function FallbackCompositionState(root) {
+  this._root = root;
+  this._startText = this.getText();
+  this._fallbackText = null;
+}
+
+assign(FallbackCompositionState.prototype, {
+  /**
+   * Get current text of input.
+   *
+   * @return {string}
+   */
+  getText: function() {
+    if ('value' in this._root) {
+      return this._root.value;
+    }
+    return this._root[getTextContentAccessor()];
+  },
+
+  /**
+   * Determine the differing substring between the initially stored
+   * text content and the current content.
+   *
+   * @return {string}
+   */
+  getData: function() {
+    if (this._fallbackText) {
+      return this._fallbackText;
+    }
+
+    var start;
+    var startValue = this._startText;
+    var startLength = startValue.length;
+    var end;
+    var endValue = this.getText();
+    var endLength = endValue.length;
+
+    for (start = 0; start < startLength; start++) {
+      if (startValue[start] !== endValue[start]) {
+        break;
+      }
+    }
+
+    var minEnd = startLength - start;
+    for (end = 1; end <= minEnd; end++) {
+      if (startValue[startLength - end] !== endValue[endLength - end]) {
+        break;
+      }
+    }
+
+    var sliceTail = end > 1 ? 1 - end : undefined;
+    this._fallbackText = endValue.slice(start, sliceTail);
+    return this._fallbackText;
+  }
+});
+
+PooledClass.addPoolingTo(FallbackCompositionState);
+
+module.exports = FallbackCompositionState;
+
+},{"./Object.assign":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/Object.assign.js","./PooledClass":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/PooledClass.js","./getTextContentAccessor":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/getTextContentAccessor.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/HTMLDOMPropertyConfig.js":[function(require,module,exports){
 /**
  * Copyright 2013-2014, Facebook, Inc.
  * All rights reserved.
@@ -3595,7 +3826,7 @@ module.exports = ExecutionEnvironment;
 
 /*jslint bitwise: true*/
 
-"use strict";
+'use strict';
 
 var DOMProperty = require("./DOMProperty");
 var ExecutionEnvironment = require("./ExecutionEnvironment");
@@ -3678,6 +3909,7 @@ var HTMLDOMPropertyConfig = {
     formNoValidate: HAS_BOOLEAN_VALUE,
     formTarget: MUST_USE_ATTRIBUTE,
     frameBorder: MUST_USE_ATTRIBUTE,
+    headers: null,
     height: MUST_USE_ATTRIBUTE,
     hidden: MUST_USE_ATTRIBUTE | HAS_BOOLEAN_VALUE,
     href: null,
@@ -3743,12 +3975,17 @@ var HTMLDOMPropertyConfig = {
     /**
      * Non-standard Properties
      */
-    autoCapitalize: null, // Supported in Mobile Safari for keyboard hints
-    autoCorrect: null, // Supported in Mobile Safari for keyboard hints
-    itemProp: MUST_USE_ATTRIBUTE, // Microdata: http://schema.org/docs/gs.html
-    itemScope: MUST_USE_ATTRIBUTE | HAS_BOOLEAN_VALUE, // Microdata: http://schema.org/docs/gs.html
-    itemType: MUST_USE_ATTRIBUTE, // Microdata: http://schema.org/docs/gs.html
-    property: null // Supports OG in meta tags
+    // autoCapitalize and autoCorrect are supported in Mobile Safari for
+    // keyboard hints.
+    autoCapitalize: null,
+    autoCorrect: null,
+    // itemProp, itemScope, itemType are for Microdata support. See
+    // http://schema.org/docs/gs.html
+    itemProp: MUST_USE_ATTRIBUTE,
+    itemScope: MUST_USE_ATTRIBUTE | HAS_BOOLEAN_VALUE,
+    itemType: MUST_USE_ATTRIBUTE,
+    // property is supported for OpenGraph in meta tags.
+    property: null
   },
   DOMAttributeNames: {
     acceptCharset: 'accept-charset',
@@ -3787,7 +4024,7 @@ module.exports = HTMLDOMPropertyConfig;
  * @typechecks static-only
  */
 
-"use strict";
+'use strict';
 
 var ReactPropTypes = require("./ReactPropTypes");
 
@@ -3858,7 +4095,7 @@ var LinkedValueUtils = {
             props.onChange ||
             props.readOnly ||
             props.disabled) {
-          return;
+          return null;
         }
         return new Error(
           'You provided a `value` prop to a form field without an ' +
@@ -3872,7 +4109,7 @@ var LinkedValueUtils = {
             props.onChange ||
             props.readOnly ||
             props.disabled) {
-          return;
+          return null;
         }
         return new Error(
           'You provided a `checked` prop to a form field without an ' +
@@ -3942,7 +4179,7 @@ module.exports = LinkedValueUtils;
  * @providesModule LocalEventTrapMixin
  */
 
-"use strict";
+'use strict';
 
 var ReactBrowserEventEmitter = require("./ReactBrowserEventEmitter");
 
@@ -3957,10 +4194,17 @@ function remove(event) {
 var LocalEventTrapMixin = {
   trapBubbledEvent:function(topLevelType, handlerBaseName) {
     ("production" !== process.env.NODE_ENV ? invariant(this.isMounted(), 'Must be mounted to trap events') : invariant(this.isMounted()));
+    // If a component renders to null or if another component fatals and causes
+    // the state of the tree to be corrupted, `node` here can be null.
+    var node = this.getDOMNode();
+    ("production" !== process.env.NODE_ENV ? invariant(
+      node,
+      'LocalEventTrapMixin.trapBubbledEvent(...): Requires node to be rendered.'
+    ) : invariant(node));
     var listener = ReactBrowserEventEmitter.trapBubbledEvent(
       topLevelType,
       handlerBaseName,
-      this.getDOMNode()
+      node
     );
     this._localEventListeners =
       accumulateInto(this._localEventListeners, listener);
@@ -3992,7 +4236,7 @@ module.exports = LocalEventTrapMixin;
  * @typechecks static-only
  */
 
-"use strict";
+'use strict';
 
 var EventConstants = require("./EventConstants");
 
@@ -4051,6 +4295,8 @@ module.exports = MobileSafariClickEventPlugin;
 
 // https://people.mozilla.org/~jorendorff/es6-draft.html#sec-object.assign
 
+'use strict';
+
 function assign(target, sources) {
   if (target == null) {
     throw new TypeError('Object.assign target cannot be null or undefined');
@@ -4080,7 +4326,7 @@ function assign(target, sources) {
   }
 
   return to;
-};
+}
 
 module.exports = assign;
 
@@ -4097,7 +4343,7 @@ module.exports = assign;
  * @providesModule PooledClass
  */
 
-"use strict";
+'use strict';
 
 var invariant = require("./invariant");
 
@@ -4213,31 +4459,32 @@ module.exports = PooledClass;
  * @providesModule React
  */
 
-"use strict";
+/* globals __REACT_DEVTOOLS_GLOBAL_HOOK__*/
+
+'use strict';
 
 var DOMPropertyOperations = require("./DOMPropertyOperations");
 var EventPluginUtils = require("./EventPluginUtils");
 var ReactChildren = require("./ReactChildren");
 var ReactComponent = require("./ReactComponent");
-var ReactCompositeComponent = require("./ReactCompositeComponent");
+var ReactClass = require("./ReactClass");
 var ReactContext = require("./ReactContext");
 var ReactCurrentOwner = require("./ReactCurrentOwner");
 var ReactElement = require("./ReactElement");
 var ReactElementValidator = require("./ReactElementValidator");
 var ReactDOM = require("./ReactDOM");
 var ReactDOMComponent = require("./ReactDOMComponent");
+var ReactDOMTextComponent = require("./ReactDOMTextComponent");
 var ReactDefaultInjection = require("./ReactDefaultInjection");
 var ReactInstanceHandles = require("./ReactInstanceHandles");
-var ReactLegacyElement = require("./ReactLegacyElement");
 var ReactMount = require("./ReactMount");
 var ReactMultiChild = require("./ReactMultiChild");
 var ReactPerf = require("./ReactPerf");
 var ReactPropTypes = require("./ReactPropTypes");
 var ReactServerRendering = require("./ReactServerRendering");
-var ReactTextComponent = require("./ReactTextComponent");
 
 var assign = require("./Object.assign");
-var deprecated = require("./deprecated");
+var findDOMNode = require("./findDOMNode");
 var onlyChild = require("./onlyChild");
 
 ReactDefaultInjection.inject();
@@ -4250,14 +4497,6 @@ if ("production" !== process.env.NODE_ENV) {
   createFactory = ReactElementValidator.createFactory;
 }
 
-// TODO: Drop legacy elements once classes no longer export these factories
-createElement = ReactLegacyElement.wrapCreateElement(
-  createElement
-);
-createFactory = ReactLegacyElement.wrapCreateFactory(
-  createFactory
-);
-
 var render = ReactPerf.measure('React', 'render', ReactMount.render);
 
 var React = {
@@ -4267,56 +4506,31 @@ var React = {
     count: ReactChildren.count,
     only: onlyChild
   },
+  Component: ReactComponent,
   DOM: ReactDOM,
   PropTypes: ReactPropTypes,
   initializeTouchEvents: function(shouldUseTouch) {
     EventPluginUtils.useTouchEvents = shouldUseTouch;
   },
-  createClass: ReactCompositeComponent.createClass,
+  createClass: ReactClass.createClass,
   createElement: createElement,
   createFactory: createFactory,
+  createMixin: function(mixin) {
+    // Currently a noop. Will be used to validate and trace mixins.
+    return mixin;
+  },
   constructAndRenderComponent: ReactMount.constructAndRenderComponent,
   constructAndRenderComponentByID: ReactMount.constructAndRenderComponentByID,
+  findDOMNode: findDOMNode,
   render: render,
   renderToString: ReactServerRendering.renderToString,
   renderToStaticMarkup: ReactServerRendering.renderToStaticMarkup,
   unmountComponentAtNode: ReactMount.unmountComponentAtNode,
-  isValidClass: ReactLegacyElement.isValidClass,
   isValidElement: ReactElement.isValidElement,
   withContext: ReactContext.withContext,
 
   // Hook for JSX spread, don't use this for anything else.
-  __spread: assign,
-
-  // Deprecations (remove for 0.13)
-  renderComponent: deprecated(
-    'React',
-    'renderComponent',
-    'render',
-    this,
-    render
-  ),
-  renderComponentToString: deprecated(
-    'React',
-    'renderComponentToString',
-    'renderToString',
-    this,
-    ReactServerRendering.renderToString
-  ),
-  renderComponentToStaticMarkup: deprecated(
-    'React',
-    'renderComponentToStaticMarkup',
-    'renderToStaticMarkup',
-    this,
-    ReactServerRendering.renderToStaticMarkup
-  ),
-  isValidComponent: deprecated(
-    'React',
-    'isValidComponent',
-    'isValidElement',
-    this,
-    ReactElement.isValidElement
-  )
+  __spread: assign
 };
 
 // Inject the runtime into a devtools global hook regardless of browser.
@@ -4325,14 +4539,14 @@ if (
   typeof __REACT_DEVTOOLS_GLOBAL_HOOK__ !== 'undefined' &&
   typeof __REACT_DEVTOOLS_GLOBAL_HOOK__.inject === 'function') {
   __REACT_DEVTOOLS_GLOBAL_HOOK__.inject({
-    Component: ReactComponent,
+    // TODO: Inject a hook for notifying devtools of updates
     CurrentOwner: ReactCurrentOwner,
     DOMComponent: ReactDOMComponent,
     DOMPropertyOperations: DOMPropertyOperations,
     InstanceHandles: ReactInstanceHandles,
     Mount: ReactMount,
     MultiChild: ReactMultiChild,
-    TextComponent: ReactTextComponent
+    TextComponent: ReactDOMTextComponent
   });
 }
 
@@ -4381,15 +4595,12 @@ if ("production" !== process.env.NODE_ENV) {
   }
 }
 
-// Version exists only in the open-source version of React, not in Facebook's
-// internal version.
-React.version = '0.12.2';
+React.version = '0.13.0-beta.1';
 
 module.exports = React;
 
 }).call(this,require('_process'))
-},{"./DOMPropertyOperations":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/DOMPropertyOperations.js","./EventPluginUtils":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/EventPluginUtils.js","./ExecutionEnvironment":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ExecutionEnvironment.js","./Object.assign":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/Object.assign.js","./ReactChildren":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactChildren.js","./ReactComponent":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactComponent.js","./ReactCompositeComponent":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactCompositeComponent.js","./ReactContext":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactContext.js","./ReactCurrentOwner":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactCurrentOwner.js","./ReactDOM":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactDOM.js","./ReactDOMComponent":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactDOMComponent.js","./ReactDefaultInjection":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactDefaultInjection.js","./ReactElement":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactElement.js","./ReactElementValidator":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactElementValidator.js","./ReactInstanceHandles":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactInstanceHandles.js","./ReactLegacyElement":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactLegacyElement.js","./ReactMount":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactMount.js","./ReactMultiChild":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactMultiChild.js","./ReactPerf":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactPerf.js","./ReactPropTypes":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactPropTypes.js","./ReactServerRendering":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactServerRendering.js","./ReactTextComponent":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactTextComponent.js","./deprecated":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/deprecated.js","./onlyChild":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/onlyChild.js","_process":"/Users/sahat/Projects/trip-planner/node_modules/browserify/node_modules/process/browser.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactBrowserComponentMixin.js":[function(require,module,exports){
-(function (process){
+},{"./DOMPropertyOperations":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/DOMPropertyOperations.js","./EventPluginUtils":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/EventPluginUtils.js","./ExecutionEnvironment":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ExecutionEnvironment.js","./Object.assign":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/Object.assign.js","./ReactChildren":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactChildren.js","./ReactClass":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactClass.js","./ReactComponent":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactComponent.js","./ReactContext":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactContext.js","./ReactCurrentOwner":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactCurrentOwner.js","./ReactDOM":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactDOM.js","./ReactDOMComponent":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactDOMComponent.js","./ReactDOMTextComponent":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactDOMTextComponent.js","./ReactDefaultInjection":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactDefaultInjection.js","./ReactElement":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactElement.js","./ReactElementValidator":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactElementValidator.js","./ReactInstanceHandles":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactInstanceHandles.js","./ReactMount":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactMount.js","./ReactMultiChild":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactMultiChild.js","./ReactPerf":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactPerf.js","./ReactPropTypes":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactPropTypes.js","./ReactServerRendering":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactServerRendering.js","./findDOMNode":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/findDOMNode.js","./onlyChild":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/onlyChild.js","_process":"/Users/sahat/Projects/trip-planner/node_modules/browserify/node_modules/process/browser.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactBrowserComponentMixin.js":[function(require,module,exports){
 /**
  * Copyright 2013-2014, Facebook, Inc.
  * All rights reserved.
@@ -4401,12 +4612,9 @@ module.exports = React;
  * @providesModule ReactBrowserComponentMixin
  */
 
-"use strict";
+'use strict';
 
-var ReactEmptyComponent = require("./ReactEmptyComponent");
-var ReactMount = require("./ReactMount");
-
-var invariant = require("./invariant");
+var findDOMNode = require("./findDOMNode");
 
 var ReactBrowserComponentMixin = {
   /**
@@ -4417,21 +4625,13 @@ var ReactBrowserComponentMixin = {
    * @protected
    */
   getDOMNode: function() {
-    ("production" !== process.env.NODE_ENV ? invariant(
-      this.isMounted(),
-      'getDOMNode(): A component must be mounted to have a DOM node.'
-    ) : invariant(this.isMounted()));
-    if (ReactEmptyComponent.isNullComponentID(this._rootNodeID)) {
-      return null;
-    }
-    return ReactMount.getNode(this._rootNodeID);
+    return findDOMNode(this);
   }
 };
 
 module.exports = ReactBrowserComponentMixin;
 
-}).call(this,require('_process'))
-},{"./ReactEmptyComponent":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactEmptyComponent.js","./ReactMount":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactMount.js","./invariant":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/invariant.js","_process":"/Users/sahat/Projects/trip-planner/node_modules/browserify/node_modules/process/browser.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactBrowserEventEmitter.js":[function(require,module,exports){
+},{"./findDOMNode":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/findDOMNode.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactBrowserEventEmitter.js":[function(require,module,exports){
 /**
  * Copyright 2013-2014, Facebook, Inc.
  * All rights reserved.
@@ -4444,7 +4644,7 @@ module.exports = ReactBrowserComponentMixin;
  * @typechecks static-only
  */
 
-"use strict";
+'use strict';
 
 var EventConstants = require("./EventConstants");
 var EventPluginHub = require("./EventPluginHub");
@@ -4560,7 +4760,7 @@ var topEventMapping = {
 /**
  * To ensure no conflicts with other potential React instances on the page
  */
-var topListenersIDKey = "_reactListenersID" + String(Math.random()).slice(2);
+var topListenersIDKey = '_reactListenersID' + String(Math.random()).slice(2);
 
 function getListeningForDocument(mountAt) {
   // In IE8, `mountAt` is a host object and doesn't have `hasOwnProperty`
@@ -4617,8 +4817,7 @@ var ReactBrowserEventEmitter = assign({}, ReactEventEmitterMixin, {
    */
   isEnabled: function() {
     return !!(
-      ReactBrowserEventEmitter.ReactEventListener &&
-      ReactBrowserEventEmitter.ReactEventListener.isEnabled()
+      (ReactBrowserEventEmitter.ReactEventListener && ReactBrowserEventEmitter.ReactEventListener.isEnabled())
     );
   },
 
@@ -4653,8 +4852,7 @@ var ReactBrowserEventEmitter = assign({}, ReactEventEmitterMixin, {
     for (var i = 0, l = dependencies.length; i < l; i++) {
       var dependency = dependencies[i];
       if (!(
-            isListening.hasOwnProperty(dependency) &&
-            isListening[dependency]
+            (isListening.hasOwnProperty(dependency) && isListening[dependency])
           )) {
         if (dependency === topLevelTypes.topWheel) {
           if (isEventSupported('wheel')) {
@@ -4786,7 +4984,134 @@ var ReactBrowserEventEmitter = assign({}, ReactEventEmitterMixin, {
 
 module.exports = ReactBrowserEventEmitter;
 
-},{"./EventConstants":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/EventConstants.js","./EventPluginHub":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/EventPluginHub.js","./EventPluginRegistry":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/EventPluginRegistry.js","./Object.assign":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/Object.assign.js","./ReactEventEmitterMixin":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactEventEmitterMixin.js","./ViewportMetrics":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ViewportMetrics.js","./isEventSupported":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/isEventSupported.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactChildren.js":[function(require,module,exports){
+},{"./EventConstants":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/EventConstants.js","./EventPluginHub":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/EventPluginHub.js","./EventPluginRegistry":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/EventPluginRegistry.js","./Object.assign":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/Object.assign.js","./ReactEventEmitterMixin":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactEventEmitterMixin.js","./ViewportMetrics":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ViewportMetrics.js","./isEventSupported":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/isEventSupported.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactChildReconciler.js":[function(require,module,exports){
+/**
+ * Copyright 2014, Facebook, Inc.
+ * All rights reserved.
+ *
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
+ *
+ * @providesModule ReactChildReconciler
+ * @typechecks static-only
+ */
+
+'use strict';
+
+var ReactReconciler = require("./ReactReconciler");
+
+var flattenChildren = require("./flattenChildren");
+var instantiateReactComponent = require("./instantiateReactComponent");
+var shouldUpdateReactComponent = require("./shouldUpdateReactComponent");
+
+/**
+ * ReactChildReconciler provides helpers for initializing or updating a set of
+ * children. Its output is suitable for passing it onto ReactMultiChild which
+ * does diffed reordering and insertion.
+ */
+var ReactChildReconciler = {
+
+  /**
+   * Generates a "mount image" for each of the supplied children. In the case
+   * of `ReactDOMComponent`, a mount image is a string of markup.
+   *
+   * @param {?object} nestedChildNodes Nested child maps.
+   * @return {?object} A set of child instances.
+   * @internal
+   */
+  instantiateChildren: function(nestedChildNodes, transaction, context) {
+    var children = flattenChildren(nestedChildNodes);
+    for (var name in children) {
+      if (children.hasOwnProperty(name)) {
+        var child = children[name];
+        // The rendered children must be turned into instances as they're
+        // mounted.
+        var childInstance = instantiateReactComponent(child, null);
+        children[name] = childInstance;
+      }
+    }
+    return children;
+  },
+
+  /**
+   * Updates the rendered children and returns a new set of children.
+   *
+   * @param {?object} prevChildren Previously initialized set of children.
+   * @param {?object} nextNestedChildNodes Nested child maps.
+   * @param {ReactReconcileTransaction} transaction
+   * @param {object} context
+   * @return {?object} A new set of child instances.
+   * @internal
+   */
+  updateChildren: function(
+    prevChildren,
+    nextNestedChildNodes,
+    transaction,
+    context) {
+    // We currently don't have a way to track moves here but if we use iterators
+    // instead of for..in we can zip the iterators and check if an item has
+    // moved.
+    // TODO: If nothing has changed, return the prevChildren object so that we
+    // can quickly bailout if nothing has changed.
+    var nextChildren = flattenChildren(nextNestedChildNodes);
+    if (!nextChildren && !prevChildren) {
+      return null;
+    }
+    var name;
+    for (name in nextChildren) {
+      if (!nextChildren.hasOwnProperty(name)) {
+        continue;
+      }
+      var prevChild = prevChildren && prevChildren[name];
+      var prevElement = prevChild && prevChild._currentElement;
+      var nextElement = nextChildren[name];
+      if (shouldUpdateReactComponent(prevElement, nextElement)) {
+        ReactReconciler.receiveComponent(
+          prevChild, nextElement, transaction, context
+        );
+        nextChildren[name] = prevChild;
+      } else {
+        if (prevChild) {
+          ReactReconciler.unmountComponent(prevChild, name);
+        }
+        // The child must be instantiated before it's mounted.
+        var nextChildInstance = instantiateReactComponent(
+          nextElement,
+          null
+        );
+        nextChildren[name] = nextChildInstance;
+      }
+    }
+    // Unmount children that are no longer present.
+    for (name in prevChildren) {
+      if (prevChildren.hasOwnProperty(name) &&
+          !(nextChildren && nextChildren.hasOwnProperty(name))) {
+        ReactReconciler.unmountComponent(prevChildren[name]);
+      }
+    }
+    return nextChildren;
+  },
+
+  /**
+   * Unmounts all rendered children. This should be used to clean up children
+   * when this component is unmounted.
+   *
+   * @param {?object} renderedChildren Previously initialized set of children.
+   * @internal
+   */
+  unmountChildren: function(renderedChildren) {
+    for (var name in renderedChildren) {
+      var renderedChild = renderedChildren[name];
+      ReactReconciler.unmountComponent(renderedChild);
+    }
+  }
+
+};
+
+module.exports = ReactChildReconciler;
+
+},{"./ReactReconciler":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactReconciler.js","./flattenChildren":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/flattenChildren.js","./instantiateReactComponent":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/instantiateReactComponent.js","./shouldUpdateReactComponent":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/shouldUpdateReactComponent.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactChildren.js":[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2014, Facebook, Inc.
@@ -4799,7 +5124,7 @@ module.exports = ReactBrowserEventEmitter;
  * @providesModule ReactChildren
  */
 
-"use strict";
+'use strict';
 
 var PooledClass = require("./PooledClass");
 
@@ -4871,13 +5196,15 @@ function mapSingleChildIntoContext(traverseContext, child, name, i) {
   var mapResult = mapBookKeeping.mapResult;
 
   var keyUnique = !mapResult.hasOwnProperty(name);
-  ("production" !== process.env.NODE_ENV ? warning(
-    keyUnique,
-    'ReactChildren.map(...): Encountered two children with the same key, ' +
-    '`%s`. Child keys must be unique; when two children share a key, only ' +
-    'the first child will be used.',
-    name
-  ) : null);
+  if ("production" !== process.env.NODE_ENV) {
+    ("production" !== process.env.NODE_ENV ? warning(
+      keyUnique,
+      'ReactChildren.map(...): Encountered two children with the same key, ' +
+      '`%s`. Child keys must be unique; when two children share a key, only ' +
+      'the first child will be used.',
+      name
+    ) : null);
+  }
 
   if (keyUnique) {
     var mappedChild =
@@ -4936,7 +5263,7 @@ var ReactChildren = {
 module.exports = ReactChildren;
 
 }).call(this,require('_process'))
-},{"./PooledClass":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/PooledClass.js","./traverseAllChildren":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/traverseAllChildren.js","./warning":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/warning.js","_process":"/Users/sahat/Projects/trip-planner/node_modules/browserify/node_modules/process/browser.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactComponent.js":[function(require,module,exports){
+},{"./PooledClass":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/PooledClass.js","./traverseAllChildren":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/traverseAllChildren.js","./warning":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/warning.js","_process":"/Users/sahat/Projects/trip-planner/node_modules/browserify/node_modules/process/browser.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactClass.js":[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2014, Facebook, Inc.
@@ -4946,605 +5273,31 @@ module.exports = ReactChildren;
  * LICENSE file in the root directory of this source tree. An additional grant
  * of patent rights can be found in the PATENTS file in the same directory.
  *
- * @providesModule ReactComponent
+ * @providesModule ReactClass
  */
 
-"use strict";
-
-var ReactElement = require("./ReactElement");
-var ReactOwner = require("./ReactOwner");
-var ReactUpdates = require("./ReactUpdates");
-
-var assign = require("./Object.assign");
-var invariant = require("./invariant");
-var keyMirror = require("./keyMirror");
-
-/**
- * Every React component is in one of these life cycles.
- */
-var ComponentLifeCycle = keyMirror({
-  /**
-   * Mounted components have a DOM node representation and are capable of
-   * receiving new props.
-   */
-  MOUNTED: null,
-  /**
-   * Unmounted components are inactive and cannot receive new props.
-   */
-  UNMOUNTED: null
-});
-
-var injected = false;
-
-/**
- * Optionally injectable environment dependent cleanup hook. (server vs.
- * browser etc). Example: A browser system caches DOM nodes based on component
- * ID and must remove that cache entry when this instance is unmounted.
- *
- * @private
- */
-var unmountIDFromEnvironment = null;
-
-/**
- * The "image" of a component tree, is the platform specific (typically
- * serialized) data that represents a tree of lower level UI building blocks.
- * On the web, this "image" is HTML markup which describes a construction of
- * low level `div` and `span` nodes. Other platforms may have different
- * encoding of this "image". This must be injected.
- *
- * @private
- */
-var mountImageIntoNode = null;
-
-/**
- * Components are the basic units of composition in React.
- *
- * Every component accepts a set of keyed input parameters known as "props" that
- * are initialized by the constructor. Once a component is mounted, the props
- * can be mutated using `setProps` or `replaceProps`.
- *
- * Every component is capable of the following operations:
- *
- *   `mountComponent`
- *     Initializes the component, renders markup, and registers event listeners.
- *
- *   `receiveComponent`
- *     Updates the rendered DOM nodes to match the given component.
- *
- *   `unmountComponent`
- *     Releases any resources allocated by this component.
- *
- * Components can also be "owned" by other components. Being owned by another
- * component means being constructed by that component. This is different from
- * being the child of a component, which means having a DOM representation that
- * is a child of the DOM representation of that component.
- *
- * @class ReactComponent
- */
-var ReactComponent = {
-
-  injection: {
-    injectEnvironment: function(ReactComponentEnvironment) {
-      ("production" !== process.env.NODE_ENV ? invariant(
-        !injected,
-        'ReactComponent: injectEnvironment() can only be called once.'
-      ) : invariant(!injected));
-      mountImageIntoNode = ReactComponentEnvironment.mountImageIntoNode;
-      unmountIDFromEnvironment =
-        ReactComponentEnvironment.unmountIDFromEnvironment;
-      ReactComponent.BackendIDOperations =
-        ReactComponentEnvironment.BackendIDOperations;
-      injected = true;
-    }
-  },
-
-  /**
-   * @internal
-   */
-  LifeCycle: ComponentLifeCycle,
-
-  /**
-   * Injected module that provides ability to mutate individual properties.
-   * Injected into the base class because many different subclasses need access
-   * to this.
-   *
-   * @internal
-   */
-  BackendIDOperations: null,
-
-  /**
-   * Base functionality for every ReactComponent constructor. Mixed into the
-   * `ReactComponent` prototype, but exposed statically for easy access.
-   *
-   * @lends {ReactComponent.prototype}
-   */
-  Mixin: {
-
-    /**
-     * Checks whether or not this component is mounted.
-     *
-     * @return {boolean} True if mounted, false otherwise.
-     * @final
-     * @protected
-     */
-    isMounted: function() {
-      return this._lifeCycleState === ComponentLifeCycle.MOUNTED;
-    },
-
-    /**
-     * Sets a subset of the props.
-     *
-     * @param {object} partialProps Subset of the next props.
-     * @param {?function} callback Called after props are updated.
-     * @final
-     * @public
-     */
-    setProps: function(partialProps, callback) {
-      // Merge with the pending element if it exists, otherwise with existing
-      // element props.
-      var element = this._pendingElement || this._currentElement;
-      this.replaceProps(
-        assign({}, element.props, partialProps),
-        callback
-      );
-    },
-
-    /**
-     * Replaces all of the props.
-     *
-     * @param {object} props New props.
-     * @param {?function} callback Called after props are updated.
-     * @final
-     * @public
-     */
-    replaceProps: function(props, callback) {
-      ("production" !== process.env.NODE_ENV ? invariant(
-        this.isMounted(),
-        'replaceProps(...): Can only update a mounted component.'
-      ) : invariant(this.isMounted()));
-      ("production" !== process.env.NODE_ENV ? invariant(
-        this._mountDepth === 0,
-        'replaceProps(...): You called `setProps` or `replaceProps` on a ' +
-        'component with a parent. This is an anti-pattern since props will ' +
-        'get reactively updated when rendered. Instead, change the owner\'s ' +
-        '`render` method to pass the correct value as props to the component ' +
-        'where it is created.'
-      ) : invariant(this._mountDepth === 0));
-      // This is a deoptimized path. We optimize for always having a element.
-      // This creates an extra internal element.
-      this._pendingElement = ReactElement.cloneAndReplaceProps(
-        this._pendingElement || this._currentElement,
-        props
-      );
-      ReactUpdates.enqueueUpdate(this, callback);
-    },
-
-    /**
-     * Schedule a partial update to the props. Only used for internal testing.
-     *
-     * @param {object} partialProps Subset of the next props.
-     * @param {?function} callback Called after props are updated.
-     * @final
-     * @internal
-     */
-    _setPropsInternal: function(partialProps, callback) {
-      // This is a deoptimized path. We optimize for always having a element.
-      // This creates an extra internal element.
-      var element = this._pendingElement || this._currentElement;
-      this._pendingElement = ReactElement.cloneAndReplaceProps(
-        element,
-        assign({}, element.props, partialProps)
-      );
-      ReactUpdates.enqueueUpdate(this, callback);
-    },
-
-    /**
-     * Base constructor for all React components.
-     *
-     * Subclasses that override this method should make sure to invoke
-     * `ReactComponent.Mixin.construct.call(this, ...)`.
-     *
-     * @param {ReactElement} element
-     * @internal
-     */
-    construct: function(element) {
-      // This is the public exposed props object after it has been processed
-      // with default props. The element's props represents the true internal
-      // state of the props.
-      this.props = element.props;
-      // Record the component responsible for creating this component.
-      // This is accessible through the element but we maintain an extra
-      // field for compatibility with devtools and as a way to make an
-      // incremental update. TODO: Consider deprecating this field.
-      this._owner = element._owner;
-
-      // All components start unmounted.
-      this._lifeCycleState = ComponentLifeCycle.UNMOUNTED;
-
-      // See ReactUpdates.
-      this._pendingCallbacks = null;
-
-      // We keep the old element and a reference to the pending element
-      // to track updates.
-      this._currentElement = element;
-      this._pendingElement = null;
-    },
-
-    /**
-     * Initializes the component, renders markup, and registers event listeners.
-     *
-     * NOTE: This does not insert any nodes into the DOM.
-     *
-     * Subclasses that override this method should make sure to invoke
-     * `ReactComponent.Mixin.mountComponent.call(this, ...)`.
-     *
-     * @param {string} rootID DOM ID of the root node.
-     * @param {ReactReconcileTransaction|ReactServerRenderingTransaction} transaction
-     * @param {number} mountDepth number of components in the owner hierarchy.
-     * @return {?string} Rendered markup to be inserted into the DOM.
-     * @internal
-     */
-    mountComponent: function(rootID, transaction, mountDepth) {
-      ("production" !== process.env.NODE_ENV ? invariant(
-        !this.isMounted(),
-        'mountComponent(%s, ...): Can only mount an unmounted component. ' +
-        'Make sure to avoid storing components between renders or reusing a ' +
-        'single component instance in multiple places.',
-        rootID
-      ) : invariant(!this.isMounted()));
-      var ref = this._currentElement.ref;
-      if (ref != null) {
-        var owner = this._currentElement._owner;
-        ReactOwner.addComponentAsRefTo(this, ref, owner);
-      }
-      this._rootNodeID = rootID;
-      this._lifeCycleState = ComponentLifeCycle.MOUNTED;
-      this._mountDepth = mountDepth;
-      // Effectively: return '';
-    },
-
-    /**
-     * Releases any resources allocated by `mountComponent`.
-     *
-     * NOTE: This does not remove any nodes from the DOM.
-     *
-     * Subclasses that override this method should make sure to invoke
-     * `ReactComponent.Mixin.unmountComponent.call(this)`.
-     *
-     * @internal
-     */
-    unmountComponent: function() {
-      ("production" !== process.env.NODE_ENV ? invariant(
-        this.isMounted(),
-        'unmountComponent(): Can only unmount a mounted component.'
-      ) : invariant(this.isMounted()));
-      var ref = this._currentElement.ref;
-      if (ref != null) {
-        ReactOwner.removeComponentAsRefFrom(this, ref, this._owner);
-      }
-      unmountIDFromEnvironment(this._rootNodeID);
-      this._rootNodeID = null;
-      this._lifeCycleState = ComponentLifeCycle.UNMOUNTED;
-    },
-
-    /**
-     * Given a new instance of this component, updates the rendered DOM nodes
-     * as if that instance was rendered instead.
-     *
-     * Subclasses that override this method should make sure to invoke
-     * `ReactComponent.Mixin.receiveComponent.call(this, ...)`.
-     *
-     * @param {object} nextComponent Next set of properties.
-     * @param {ReactReconcileTransaction} transaction
-     * @internal
-     */
-    receiveComponent: function(nextElement, transaction) {
-      ("production" !== process.env.NODE_ENV ? invariant(
-        this.isMounted(),
-        'receiveComponent(...): Can only update a mounted component.'
-      ) : invariant(this.isMounted()));
-      this._pendingElement = nextElement;
-      this.performUpdateIfNecessary(transaction);
-    },
-
-    /**
-     * If `_pendingElement` is set, update the component.
-     *
-     * @param {ReactReconcileTransaction} transaction
-     * @internal
-     */
-    performUpdateIfNecessary: function(transaction) {
-      if (this._pendingElement == null) {
-        return;
-      }
-      var prevElement = this._currentElement;
-      var nextElement = this._pendingElement;
-      this._currentElement = nextElement;
-      this.props = nextElement.props;
-      this._owner = nextElement._owner;
-      this._pendingElement = null;
-      this.updateComponent(transaction, prevElement);
-    },
-
-    /**
-     * Updates the component's currently mounted representation.
-     *
-     * @param {ReactReconcileTransaction} transaction
-     * @param {object} prevElement
-     * @internal
-     */
-    updateComponent: function(transaction, prevElement) {
-      var nextElement = this._currentElement;
-
-      // If either the owner or a `ref` has changed, make sure the newest owner
-      // has stored a reference to `this`, and the previous owner (if different)
-      // has forgotten the reference to `this`. We use the element instead
-      // of the public this.props because the post processing cannot determine
-      // a ref. The ref conceptually lives on the element.
-
-      // TODO: Should this even be possible? The owner cannot change because
-      // it's forbidden by shouldUpdateReactComponent. The ref can change
-      // if you swap the keys of but not the refs. Reconsider where this check
-      // is made. It probably belongs where the key checking and
-      // instantiateReactComponent is done.
-
-      if (nextElement._owner !== prevElement._owner ||
-          nextElement.ref !== prevElement.ref) {
-        if (prevElement.ref != null) {
-          ReactOwner.removeComponentAsRefFrom(
-            this, prevElement.ref, prevElement._owner
-          );
-        }
-        // Correct, even if the owner is the same, and only the ref has changed.
-        if (nextElement.ref != null) {
-          ReactOwner.addComponentAsRefTo(
-            this,
-            nextElement.ref,
-            nextElement._owner
-          );
-        }
-      }
-    },
-
-    /**
-     * Mounts this component and inserts it into the DOM.
-     *
-     * @param {string} rootID DOM ID of the root node.
-     * @param {DOMElement} container DOM element to mount into.
-     * @param {boolean} shouldReuseMarkup If true, do not insert markup
-     * @final
-     * @internal
-     * @see {ReactMount.render}
-     */
-    mountComponentIntoNode: function(rootID, container, shouldReuseMarkup) {
-      var transaction = ReactUpdates.ReactReconcileTransaction.getPooled();
-      transaction.perform(
-        this._mountComponentIntoNode,
-        this,
-        rootID,
-        container,
-        transaction,
-        shouldReuseMarkup
-      );
-      ReactUpdates.ReactReconcileTransaction.release(transaction);
-    },
-
-    /**
-     * @param {string} rootID DOM ID of the root node.
-     * @param {DOMElement} container DOM element to mount into.
-     * @param {ReactReconcileTransaction} transaction
-     * @param {boolean} shouldReuseMarkup If true, do not insert markup
-     * @final
-     * @private
-     */
-    _mountComponentIntoNode: function(
-        rootID,
-        container,
-        transaction,
-        shouldReuseMarkup) {
-      var markup = this.mountComponent(rootID, transaction, 0);
-      mountImageIntoNode(markup, container, shouldReuseMarkup);
-    },
-
-    /**
-     * Checks if this component is owned by the supplied `owner` component.
-     *
-     * @param {ReactComponent} owner Component to check.
-     * @return {boolean} True if `owners` owns this component.
-     * @final
-     * @internal
-     */
-    isOwnedBy: function(owner) {
-      return this._owner === owner;
-    },
-
-    /**
-     * Gets another component, that shares the same owner as this one, by ref.
-     *
-     * @param {string} ref of a sibling Component.
-     * @return {?ReactComponent} the actual sibling Component.
-     * @final
-     * @internal
-     */
-    getSiblingByRef: function(ref) {
-      var owner = this._owner;
-      if (!owner || !owner.refs) {
-        return null;
-      }
-      return owner.refs[ref];
-    }
-  }
-};
-
-module.exports = ReactComponent;
-
-}).call(this,require('_process'))
-},{"./Object.assign":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/Object.assign.js","./ReactElement":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactElement.js","./ReactOwner":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactOwner.js","./ReactUpdates":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactUpdates.js","./invariant":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/invariant.js","./keyMirror":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/keyMirror.js","_process":"/Users/sahat/Projects/trip-planner/node_modules/browserify/node_modules/process/browser.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactComponentBrowserEnvironment.js":[function(require,module,exports){
-(function (process){
-/**
- * Copyright 2013-2014, Facebook, Inc.
- * All rights reserved.
- *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
- *
- * @providesModule ReactComponentBrowserEnvironment
- */
-
-/*jslint evil: true */
-
-"use strict";
-
-var ReactDOMIDOperations = require("./ReactDOMIDOperations");
-var ReactMarkupChecksum = require("./ReactMarkupChecksum");
-var ReactMount = require("./ReactMount");
-var ReactPerf = require("./ReactPerf");
-var ReactReconcileTransaction = require("./ReactReconcileTransaction");
-
-var getReactRootElementInContainer = require("./getReactRootElementInContainer");
-var invariant = require("./invariant");
-var setInnerHTML = require("./setInnerHTML");
-
-
-var ELEMENT_NODE_TYPE = 1;
-var DOC_NODE_TYPE = 9;
-
-
-/**
- * Abstracts away all functionality of `ReactComponent` requires knowledge of
- * the browser context.
- */
-var ReactComponentBrowserEnvironment = {
-  ReactReconcileTransaction: ReactReconcileTransaction,
-
-  BackendIDOperations: ReactDOMIDOperations,
-
-  /**
-   * If a particular environment requires that some resources be cleaned up,
-   * specify this in the injected Mixin. In the DOM, we would likely want to
-   * purge any cached node ID lookups.
-   *
-   * @private
-   */
-  unmountIDFromEnvironment: function(rootNodeID) {
-    ReactMount.purgeID(rootNodeID);
-  },
-
-  /**
-   * @param {string} markup Markup string to place into the DOM Element.
-   * @param {DOMElement} container DOM Element to insert markup into.
-   * @param {boolean} shouldReuseMarkup Should reuse the existing markup in the
-   * container if possible.
-   */
-  mountImageIntoNode: ReactPerf.measure(
-    'ReactComponentBrowserEnvironment',
-    'mountImageIntoNode',
-    function(markup, container, shouldReuseMarkup) {
-      ("production" !== process.env.NODE_ENV ? invariant(
-        container && (
-          container.nodeType === ELEMENT_NODE_TYPE ||
-            container.nodeType === DOC_NODE_TYPE
-        ),
-        'mountComponentIntoNode(...): Target container is not valid.'
-      ) : invariant(container && (
-        container.nodeType === ELEMENT_NODE_TYPE ||
-          container.nodeType === DOC_NODE_TYPE
-      )));
-
-      if (shouldReuseMarkup) {
-        if (ReactMarkupChecksum.canReuseMarkup(
-          markup,
-          getReactRootElementInContainer(container))) {
-          return;
-        } else {
-          ("production" !== process.env.NODE_ENV ? invariant(
-            container.nodeType !== DOC_NODE_TYPE,
-            'You\'re trying to render a component to the document using ' +
-            'server rendering but the checksum was invalid. This usually ' +
-            'means you rendered a different component type or props on ' +
-            'the client from the one on the server, or your render() ' +
-            'methods are impure. React cannot handle this case due to ' +
-            'cross-browser quirks by rendering at the document root. You ' +
-            'should look for environment dependent code in your components ' +
-            'and ensure the props are the same client and server side.'
-          ) : invariant(container.nodeType !== DOC_NODE_TYPE));
-
-          if ("production" !== process.env.NODE_ENV) {
-            console.warn(
-              'React attempted to use reuse markup in a container but the ' +
-              'checksum was invalid. This generally means that you are ' +
-              'using server rendering and the markup generated on the ' +
-              'server was not what the client was expecting. React injected ' +
-              'new markup to compensate which works but you have lost many ' +
-              'of the benefits of server rendering. Instead, figure out ' +
-              'why the markup being generated is different on the client ' +
-              'or server.'
-            );
-          }
-        }
-      }
-
-      ("production" !== process.env.NODE_ENV ? invariant(
-        container.nodeType !== DOC_NODE_TYPE,
-        'You\'re trying to render a component to the document but ' +
-          'you didn\'t use server rendering. We can\'t do this ' +
-          'without using server rendering due to cross-browser quirks. ' +
-          'See renderComponentToString() for server rendering.'
-      ) : invariant(container.nodeType !== DOC_NODE_TYPE));
-
-      setInnerHTML(container, markup);
-    }
-  )
-};
-
-module.exports = ReactComponentBrowserEnvironment;
-
-}).call(this,require('_process'))
-},{"./ReactDOMIDOperations":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactDOMIDOperations.js","./ReactMarkupChecksum":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactMarkupChecksum.js","./ReactMount":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactMount.js","./ReactPerf":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactPerf.js","./ReactReconcileTransaction":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactReconcileTransaction.js","./getReactRootElementInContainer":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/getReactRootElementInContainer.js","./invariant":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/invariant.js","./setInnerHTML":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/setInnerHTML.js","_process":"/Users/sahat/Projects/trip-planner/node_modules/browserify/node_modules/process/browser.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactCompositeComponent.js":[function(require,module,exports){
-(function (process){
-/**
- * Copyright 2013-2014, Facebook, Inc.
- * All rights reserved.
- *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
- *
- * @providesModule ReactCompositeComponent
- */
-
-"use strict";
+'use strict';
 
 var ReactComponent = require("./ReactComponent");
-var ReactContext = require("./ReactContext");
-var ReactCurrentOwner = require("./ReactCurrentOwner");
 var ReactElement = require("./ReactElement");
-var ReactElementValidator = require("./ReactElementValidator");
-var ReactEmptyComponent = require("./ReactEmptyComponent");
 var ReactErrorUtils = require("./ReactErrorUtils");
-var ReactLegacyElement = require("./ReactLegacyElement");
-var ReactOwner = require("./ReactOwner");
-var ReactPerf = require("./ReactPerf");
-var ReactPropTransferer = require("./ReactPropTransferer");
+var ReactInstanceMap = require("./ReactInstanceMap");
+var ReactLifeCycle = require("./ReactLifeCycle");
 var ReactPropTypeLocations = require("./ReactPropTypeLocations");
 var ReactPropTypeLocationNames = require("./ReactPropTypeLocationNames");
-var ReactUpdates = require("./ReactUpdates");
+var ReactUpdateQueue = require("./ReactUpdateQueue");
 
 var assign = require("./Object.assign");
-var instantiateReactComponent = require("./instantiateReactComponent");
 var invariant = require("./invariant");
 var keyMirror = require("./keyMirror");
 var keyOf = require("./keyOf");
 var monitorCodeUse = require("./monitorCodeUse");
-var mapObject = require("./mapObject");
-var shouldUpdateReactComponent = require("./shouldUpdateReactComponent");
 var warning = require("./warning");
 
 var MIXINS_KEY = keyOf({mixins: null});
 
 /**
- * Policies that describe methods in `ReactCompositeComponentInterface`.
+ * Policies that describe methods in `ReactClassInterface`.
  */
 var SpecPolicy = keyMirror({
   /**
@@ -5557,7 +5310,7 @@ var SpecPolicy = keyMirror({
    */
   DEFINE_MANY: null,
   /**
-   * These methods are overriding the base ReactCompositeComponent class.
+   * These methods are overriding the base class.
    */
   OVERRIDE_BASE: null,
   /**
@@ -5575,7 +5328,7 @@ var injectedMixins = [];
  * Composite components are higher-level components that compose other composite
  * or native components.
  *
- * To create a new type of `ReactCompositeComponent`, pass a specification of
+ * To create a new type of `ReactClass`, pass a specification of
  * your new class to `React.createClass`. The only requirement of your class
  * specification is that you implement a `render` method.
  *
@@ -5586,14 +5339,14 @@ var injectedMixins = [];
  *   });
  *
  * The class specification supports a specific protocol of methods that have
- * special meaning (e.g. `render`). See `ReactCompositeComponentInterface` for
+ * special meaning (e.g. `render`). See `ReactClassInterface` for
  * more the comprehensive protocol. Any other properties and methods in the
  * class specification will available on the prototype.
  *
- * @interface ReactCompositeComponentInterface
+ * @interface ReactClassInterface
  * @internal
  */
-var ReactCompositeComponentInterface = {
+var ReactClassInterface = {
 
   /**
    * An array of Mixin objects to include when defining your component.
@@ -5841,11 +5594,13 @@ var RESERVED_SPEC_KEYS = {
     }
   },
   childContextTypes: function(Constructor, childContextTypes) {
-    validateTypeDef(
-      Constructor,
-      childContextTypes,
-      ReactPropTypeLocations.childContext
-    );
+    if ("production" !== process.env.NODE_ENV) {
+      validateTypeDef(
+        Constructor,
+        childContextTypes,
+        ReactPropTypeLocations.childContext
+      );
+    }
     Constructor.childContextTypes = assign(
       {},
       Constructor.childContextTypes,
@@ -5853,11 +5608,13 @@ var RESERVED_SPEC_KEYS = {
     );
   },
   contextTypes: function(Constructor, contextTypes) {
-    validateTypeDef(
-      Constructor,
-      contextTypes,
-      ReactPropTypeLocations.context
-    );
+    if ("production" !== process.env.NODE_ENV) {
+      validateTypeDef(
+        Constructor,
+        contextTypes,
+        ReactPropTypeLocations.context
+      );
+    }
     Constructor.contextTypes = assign(
       {},
       Constructor.contextTypes,
@@ -5879,11 +5636,13 @@ var RESERVED_SPEC_KEYS = {
     }
   },
   propTypes: function(Constructor, propTypes) {
-    validateTypeDef(
-      Constructor,
-      propTypes,
-      ReactPropTypeLocations.prop
-    );
+    if ("production" !== process.env.NODE_ENV) {
+      validateTypeDef(
+        Constructor,
+        propTypes,
+        ReactPropTypeLocations.prop
+      );
+    }
     Constructor.propTypes = assign(
       {},
       Constructor.propTypes,
@@ -5895,40 +5654,33 @@ var RESERVED_SPEC_KEYS = {
   }
 };
 
-function getDeclarationErrorAddendum(component) {
-  var owner = component._owner || null;
-  if (owner && owner.constructor && owner.constructor.displayName) {
-    return ' Check the render method of `' + owner.constructor.displayName +
-      '`.';
-  }
-  return '';
-}
-
 function validateTypeDef(Constructor, typeDef, location) {
   for (var propName in typeDef) {
     if (typeDef.hasOwnProperty(propName)) {
-      ("production" !== process.env.NODE_ENV ? invariant(
-        typeof typeDef[propName] == 'function',
+      // use a warning instead of an invariant so components
+      // don't show up in prod but not in __DEV__
+      ("production" !== process.env.NODE_ENV ? warning(
+        typeof typeDef[propName] === 'function',
         '%s: %s type `%s` is invalid; it must be a function, usually from ' +
         'React.PropTypes.',
-        Constructor.displayName || 'ReactCompositeComponent',
+        Constructor.displayName || 'ReactClass',
         ReactPropTypeLocationNames[location],
         propName
-      ) : invariant(typeof typeDef[propName] == 'function'));
+      ) : null);
     }
   }
 }
 
 function validateMethodOverride(proto, name) {
-  var specPolicy = ReactCompositeComponentInterface.hasOwnProperty(name) ?
-    ReactCompositeComponentInterface[name] :
+  var specPolicy = ReactClassInterface.hasOwnProperty(name) ?
+    ReactClassInterface[name] :
     null;
 
   // Disallow overriding of base class methods unless explicitly allowed.
-  if (ReactCompositeComponentMixin.hasOwnProperty(name)) {
+  if (ReactClassMixin.hasOwnProperty(name)) {
     ("production" !== process.env.NODE_ENV ? invariant(
       specPolicy === SpecPolicy.OVERRIDE_BASE,
-      'ReactCompositeComponentInterface: You are attempting to override ' +
+      'ReactClassInterface: You are attempting to override ' +
       '`%s` from your class specification. Ensure that your method names ' +
       'do not overlap with React methods.',
       name
@@ -5940,7 +5692,7 @@ function validateMethodOverride(proto, name) {
     ("production" !== process.env.NODE_ENV ? invariant(
       specPolicy === SpecPolicy.DEFINE_MANY ||
       specPolicy === SpecPolicy.DEFINE_MANY_MERGED,
-      'ReactCompositeComponentInterface: You are attempting to define ' +
+      'ReactClassInterface: You are attempting to define ' +
       '`%s` on your component more than once. This conflict may be due ' +
       'to a mixin.',
       name
@@ -5949,29 +5701,9 @@ function validateMethodOverride(proto, name) {
   }
 }
 
-function validateLifeCycleOnReplaceState(instance) {
-  var compositeLifeCycleState = instance._compositeLifeCycleState;
-  ("production" !== process.env.NODE_ENV ? invariant(
-    instance.isMounted() ||
-      compositeLifeCycleState === CompositeLifeCycle.MOUNTING,
-    'replaceState(...): Can only update a mounted or mounting component.'
-  ) : invariant(instance.isMounted() ||
-    compositeLifeCycleState === CompositeLifeCycle.MOUNTING));
-  ("production" !== process.env.NODE_ENV ? invariant(
-    ReactCurrentOwner.current == null,
-    'replaceState(...): Cannot update during an existing state transition ' +
-    '(such as within `render`). Render methods should be a pure function ' +
-    'of props and state.'
-  ) : invariant(ReactCurrentOwner.current == null));
-  ("production" !== process.env.NODE_ENV ? invariant(compositeLifeCycleState !== CompositeLifeCycle.UNMOUNTING,
-    'replaceState(...): Cannot update while unmounting component. This ' +
-    'usually means you called setState() on an unmounted component.'
-  ) : invariant(compositeLifeCycleState !== CompositeLifeCycle.UNMOUNTING));
-}
-
 /**
  * Mixin helper which handles policy validation and reserved
- * specification keys when building `ReactCompositeComponent` classses.
+ * specification keys when building React classses.
  */
 function mixSpecIntoComponent(Constructor, spec) {
   if (!spec) {
@@ -5979,13 +5711,13 @@ function mixSpecIntoComponent(Constructor, spec) {
   }
 
   ("production" !== process.env.NODE_ENV ? invariant(
-    !ReactLegacyElement.isValidFactory(spec),
-    'ReactCompositeComponent: You\'re attempting to ' +
+    typeof spec !== 'function',
+    'ReactClass: You\'re attempting to ' +
     'use a component class as a mixin. Instead, just use a regular object.'
-  ) : invariant(!ReactLegacyElement.isValidFactory(spec)));
+  ) : invariant(typeof spec !== 'function'));
   ("production" !== process.env.NODE_ENV ? invariant(
     !ReactElement.isValidElement(spec),
-    'ReactCompositeComponent: You\'re attempting to ' +
+    'ReactClass: You\'re attempting to ' +
     'use a component as a mixin. Instead, just use a regular object.'
   ) : invariant(!ReactElement.isValidElement(spec)));
 
@@ -6016,16 +5748,16 @@ function mixSpecIntoComponent(Constructor, spec) {
     } else {
       // Setup methods on prototype:
       // The following member methods should not be automatically bound:
-      // 1. Expected ReactCompositeComponent methods (in the "interface").
+      // 1. Expected ReactClass methods (in the "interface").
       // 2. Overridden methods (that were mixed in).
-      var isCompositeComponentMethod =
-        ReactCompositeComponentInterface.hasOwnProperty(name);
+      var isReactClassMethod =
+        ReactClassInterface.hasOwnProperty(name);
       var isAlreadyDefined = proto.hasOwnProperty(name);
       var markedDontBind = property && property.__reactDontBind;
       var isFunction = typeof property === 'function';
       var shouldAutoBind =
         isFunction &&
-        !isCompositeComponentMethod &&
+        !isReactClassMethod &&
         !isAlreadyDefined &&
         !markedDontBind;
 
@@ -6037,21 +5769,19 @@ function mixSpecIntoComponent(Constructor, spec) {
         proto[name] = property;
       } else {
         if (isAlreadyDefined) {
-          var specPolicy = ReactCompositeComponentInterface[name];
+          var specPolicy = ReactClassInterface[name];
 
           // These cases should already be caught by validateMethodOverride
           ("production" !== process.env.NODE_ENV ? invariant(
-            isCompositeComponentMethod && (
-              specPolicy === SpecPolicy.DEFINE_MANY_MERGED ||
-              specPolicy === SpecPolicy.DEFINE_MANY
+            isReactClassMethod && (
+              (specPolicy === SpecPolicy.DEFINE_MANY_MERGED || specPolicy === SpecPolicy.DEFINE_MANY)
             ),
-            'ReactCompositeComponent: Unexpected spec policy %s for key %s ' +
+            'ReactClass: Unexpected spec policy %s for key %s ' +
             'when mixing in component specs.',
             specPolicy,
             name
-          ) : invariant(isCompositeComponentMethod && (
-            specPolicy === SpecPolicy.DEFINE_MANY_MERGED ||
-            specPolicy === SpecPolicy.DEFINE_MANY
+          ) : invariant(isReactClassMethod && (
+            (specPolicy === SpecPolicy.DEFINE_MANY_MERGED || specPolicy === SpecPolicy.DEFINE_MANY)
           )));
 
           // For methods which are defined more than once, call the existing
@@ -6089,7 +5819,7 @@ function mixStaticSpecIntoComponent(Constructor, statics) {
     var isReserved = name in RESERVED_SPEC_KEYS;
     ("production" !== process.env.NODE_ENV ? invariant(
       !isReserved,
-      'ReactCompositeComponent: You are attempting to define a reserved ' +
+      'ReactClass: You are attempting to define a reserved ' +
       'property, `%s`, that shouldn\'t be on the "statics" key. Define it ' +
       'as an instance property instead; it will still be accessible on the ' +
       'constructor.',
@@ -6099,7 +5829,7 @@ function mixStaticSpecIntoComponent(Constructor, statics) {
     var isInherited = name in Constructor;
     ("production" !== process.env.NODE_ENV ? invariant(
       !isInherited,
-      'ReactCompositeComponent: You are attempting to define ' +
+      'ReactClass: You are attempting to define ' +
       '`%s` on your component more than once. This conflict may be ' +
       'due to a mixin.',
       name
@@ -6115,24 +5845,26 @@ function mixStaticSpecIntoComponent(Constructor, statics) {
  * @param {object} two The second object
  * @return {object} one after it has been mutated to contain everything in two.
  */
-function mergeObjectsWithNoDuplicateKeys(one, two) {
+function mergeIntoWithNoDuplicateKeys(one, two) {
   ("production" !== process.env.NODE_ENV ? invariant(
     one && two && typeof one === 'object' && typeof two === 'object',
-    'mergeObjectsWithNoDuplicateKeys(): Cannot merge non-objects'
+    'mergeIntoWithNoDuplicateKeys(): Cannot merge non-objects.'
   ) : invariant(one && two && typeof one === 'object' && typeof two === 'object'));
 
-  mapObject(two, function(value, key) {
-    ("production" !== process.env.NODE_ENV ? invariant(
-      one[key] === undefined,
-      'mergeObjectsWithNoDuplicateKeys(): ' +
-      'Tried to merge two objects with the same key: `%s`. This conflict ' +
-      'may be due to a mixin; in particular, this may be caused by two ' +
-      'getInitialState() or getDefaultProps() methods returning objects ' +
-      'with clashing keys.',
-      key
-    ) : invariant(one[key] === undefined));
-    one[key] = value;
-  });
+  for (var key in two) {
+    if (two.hasOwnProperty(key)) {
+      ("production" !== process.env.NODE_ENV ? invariant(
+        one[key] === undefined,
+        'mergeIntoWithNoDuplicateKeys(): ' +
+        'Tried to merge two objects with the same key: `%s`. This conflict ' +
+        'may be due to a mixin; in particular, this may be caused by two ' +
+        'getInitialState() or getDefaultProps() methods returning objects ' +
+        'with clashing keys.',
+        key
+      ) : invariant(one[key] === undefined));
+      one[key] = two[key];
+    }
+  }
   return one;
 }
 
@@ -6153,7 +5885,10 @@ function createMergedResultFunction(one, two) {
     } else if (b == null) {
       return a;
     }
-    return mergeObjectsWithNoDuplicateKeys(a, b);
+    var c = {};
+    mergeIntoWithNoDuplicateKeys(c, a);
+    mergeIntoWithNoDuplicateKeys(c, b);
+    return c;
   };
 }
 
@@ -6173,74 +5908,100 @@ function createChainedFunction(one, two) {
 }
 
 /**
- * `ReactCompositeComponent` maintains an auxiliary life cycle state in
- * `this._compositeLifeCycleState` (which can be null).
+ * Binds a method to the component.
  *
- * This is different from the life cycle state maintained by `ReactComponent` in
- * `this._lifeCycleState`. The following diagram shows how the states overlap in
- * time. There are times when the CompositeLifeCycle is null - at those times it
- * is only meaningful to look at ComponentLifeCycle alone.
- *
- * Top Row: ReactComponent.ComponentLifeCycle
- * Low Row: ReactComponent.CompositeLifeCycle
- *
- * +-------+---------------------------------+--------+
- * |  UN   |             MOUNTED             |   UN   |
- * |MOUNTED|                                 | MOUNTED|
- * +-------+---------------------------------+--------+
- * |       ^--------+   +-------+   +--------^        |
- * |       |        |   |       |   |        |        |
- * |    0--|MOUNTING|-0-|RECEIVE|-0-|   UN   |--->0   |
- * |       |        |   |PROPS  |   |MOUNTING|        |
- * |       |        |   |       |   |        |        |
- * |       |        |   |       |   |        |        |
- * |       +--------+   +-------+   +--------+        |
- * |       |                                 |        |
- * +-------+---------------------------------+--------+
+ * @param {object} component Component whose method is going to be bound.
+ * @param {function} method Method to be bound.
+ * @return {function} The bound method.
  */
-var CompositeLifeCycle = keyMirror({
-  /**
-   * Components in the process of being mounted respond to state changes
-   * differently.
-   */
-  MOUNTING: null,
-  /**
-   * Components in the process of being unmounted are guarded against state
-   * changes.
-   */
-  UNMOUNTING: null,
-  /**
-   * Components that are mounted and receiving new props respond to state
-   * changes differently.
-   */
-  RECEIVING_PROPS: null
-});
+function bindAutoBindMethod(component, method) {
+  var boundMethod = method.bind(component);
+  if ("production" !== process.env.NODE_ENV) {
+    boundMethod.__reactBoundContext = component;
+    boundMethod.__reactBoundMethod = method;
+    boundMethod.__reactBoundArguments = null;
+    var componentName = component.constructor.displayName;
+    var _bind = boundMethod.bind;
+    /* eslint-disable block-scoped-var, no-undef */
+    boundMethod.bind = function(newThis ) {for (var args=[],$__0=1,$__1=arguments.length;$__0<$__1;$__0++) args.push(arguments[$__0]);
+      // User is trying to bind() an autobound method; we effectively will
+      // ignore the value of "this" that the user is trying to use, so
+      // let's warn.
+      if (newThis !== component && newThis !== null) {
+        monitorCodeUse('react_bind_warning', { component: componentName });
+        console.warn(
+          'bind(): React component methods may only be bound to the ' +
+          'component instance. See ' + componentName
+        );
+      } else if (!args.length) {
+        monitorCodeUse('react_bind_warning', { component: componentName });
+        console.warn(
+          'bind(): You are binding a component method to the component. ' +
+          'React does this for you automatically in a high-performance ' +
+          'way, so you can safely remove this call. See ' + componentName
+        );
+        return boundMethod;
+      }
+      var reboundMethod = _bind.apply(boundMethod, arguments);
+      reboundMethod.__reactBoundContext = component;
+      reboundMethod.__reactBoundMethod = method;
+      reboundMethod.__reactBoundArguments = args;
+      return reboundMethod;
+      /* eslint-enable */
+    };
+  }
+  return boundMethod;
+}
 
 /**
- * @lends {ReactCompositeComponent.prototype}
+ * Binds all auto-bound methods in a component.
+ *
+ * @param {object} component Component whose method is going to be bound.
  */
-var ReactCompositeComponentMixin = {
+function bindAutoBindMethods(component) {
+  for (var autoBindKey in component.__reactAutoBindMap) {
+    if (component.__reactAutoBindMap.hasOwnProperty(autoBindKey)) {
+      var method = component.__reactAutoBindMap[autoBindKey];
+      component[autoBindKey] = bindAutoBindMethod(
+        component,
+        ReactErrorUtils.guard(
+          method,
+          component.constructor.displayName + '.' + autoBindKey
+        )
+      );
+    }
+  }
+}
+
+var typeDeprecationDescriptor = {
+  enumerable: false,
+  get: function() {
+    var displayName = this.displayName || this.name || 'Component';
+    ("production" !== process.env.NODE_ENV ? warning(
+      false,
+      '%s.type is deprecated. Use %s directly to access the class.',
+      displayName,
+      displayName
+    ) : null);
+    return this;
+  }
+};
+
+/**
+ * Add more to the ReactClass base class. These are all legacy features and
+ * therefore not already part of the modern ReactComponent.
+ */
+var ReactClassMixin = {
 
   /**
-   * Base constructor for all composite component.
-   *
-   * @param {ReactElement} element
-   * @final
-   * @internal
+   * TODO: This will be deprecated because state should always keep a consistent
+   * type signature and the only use case for this, is to avoid that.
    */
-  construct: function(element) {
-    // Children can be either an array or more than one argument
-    ReactComponent.Mixin.construct.apply(this, arguments);
-    ReactOwner.Mixin.construct.apply(this, arguments);
-
-    this.state = null;
-    this._pendingState = null;
-
-    // This is the public post-processed context. The real context and pending
-    // context lives on the element.
-    this.context = null;
-
-    this._compositeLifeCycleState = null;
+  replaceState: function(newState, callback) {
+    ReactUpdateQueue.enqueueReplaceState(this, newState);
+    if (callback) {
+      ReactUpdateQueue.enqueueCallback(this, callback);
+    }
   },
 
   /**
@@ -6250,622 +6011,59 @@ var ReactCompositeComponentMixin = {
    * @final
    */
   isMounted: function() {
-    return ReactComponent.Mixin.isMounted.call(this) &&
-      this._compositeLifeCycleState !== CompositeLifeCycle.MOUNTING;
-  },
-
-  /**
-   * Initializes the component, renders markup, and registers event listeners.
-   *
-   * @param {string} rootID DOM ID of the root node.
-   * @param {ReactReconcileTransaction|ReactServerRenderingTransaction} transaction
-   * @param {number} mountDepth number of components in the owner hierarchy
-   * @return {?string} Rendered markup to be inserted into the DOM.
-   * @final
-   * @internal
-   */
-  mountComponent: ReactPerf.measure(
-    'ReactCompositeComponent',
-    'mountComponent',
-    function(rootID, transaction, mountDepth) {
-      ReactComponent.Mixin.mountComponent.call(
-        this,
-        rootID,
-        transaction,
-        mountDepth
-      );
-      this._compositeLifeCycleState = CompositeLifeCycle.MOUNTING;
-
-      if (this.__reactAutoBindMap) {
-        this._bindAutoBindMethods();
-      }
-
-      this.context = this._processContext(this._currentElement._context);
-      this.props = this._processProps(this.props);
-
-      this.state = this.getInitialState ? this.getInitialState() : null;
-      ("production" !== process.env.NODE_ENV ? invariant(
-        typeof this.state === 'object' && !Array.isArray(this.state),
-        '%s.getInitialState(): must return an object or null',
-        this.constructor.displayName || 'ReactCompositeComponent'
-      ) : invariant(typeof this.state === 'object' && !Array.isArray(this.state)));
-
-      this._pendingState = null;
-      this._pendingForceUpdate = false;
-
-      if (this.componentWillMount) {
-        this.componentWillMount();
-        // When mounting, calls to `setState` by `componentWillMount` will set
-        // `this._pendingState` without triggering a re-render.
-        if (this._pendingState) {
-          this.state = this._pendingState;
-          this._pendingState = null;
-        }
-      }
-
-      this._renderedComponent = instantiateReactComponent(
-        this._renderValidatedComponent(),
-        this._currentElement.type // The wrapping type
-      );
-
-      // Done with mounting, `setState` will now trigger UI changes.
-      this._compositeLifeCycleState = null;
-      var markup = this._renderedComponent.mountComponent(
-        rootID,
-        transaction,
-        mountDepth + 1
-      );
-      if (this.componentDidMount) {
-        transaction.getReactMountReady().enqueue(this.componentDidMount, this);
-      }
-      return markup;
-    }
-  ),
-
-  /**
-   * Releases any resources allocated by `mountComponent`.
-   *
-   * @final
-   * @internal
-   */
-  unmountComponent: function() {
-    this._compositeLifeCycleState = CompositeLifeCycle.UNMOUNTING;
-    if (this.componentWillUnmount) {
-      this.componentWillUnmount();
-    }
-    this._compositeLifeCycleState = null;
-
-    this._renderedComponent.unmountComponent();
-    this._renderedComponent = null;
-
-    ReactComponent.Mixin.unmountComponent.call(this);
-
-    // Some existing components rely on this.props even after they've been
-    // destroyed (in event handlers).
-    // TODO: this.props = null;
-    // TODO: this.state = null;
-  },
-
-  /**
-   * Sets a subset of the state. Always use this or `replaceState` to mutate
-   * state. You should treat `this.state` as immutable.
-   *
-   * There is no guarantee that `this.state` will be immediately updated, so
-   * accessing `this.state` after calling this method may return the old value.
-   *
-   * There is no guarantee that calls to `setState` will run synchronously,
-   * as they may eventually be batched together.  You can provide an optional
-   * callback that will be executed when the call to setState is actually
-   * completed.
-   *
-   * @param {object} partialState Next partial state to be merged with state.
-   * @param {?function} callback Called after state is updated.
-   * @final
-   * @protected
-   */
-  setState: function(partialState, callback) {
-    ("production" !== process.env.NODE_ENV ? invariant(
-      typeof partialState === 'object' || partialState == null,
-      'setState(...): takes an object of state variables to update.'
-    ) : invariant(typeof partialState === 'object' || partialState == null));
-    if ("production" !== process.env.NODE_ENV){
-      ("production" !== process.env.NODE_ENV ? warning(
-        partialState != null,
-        'setState(...): You passed an undefined or null state object; ' +
-        'instead, use forceUpdate().'
-      ) : null);
-    }
-    // Merge with `_pendingState` if it exists, otherwise with existing state.
-    this.replaceState(
-      assign({}, this._pendingState || this.state, partialState),
-      callback
+    var internalInstance = ReactInstanceMap.get(this);
+    return (
+      internalInstance &&
+      internalInstance !== ReactLifeCycle.currentlyMountingInstance
     );
   },
 
   /**
-   * Replaces all of the state. Always use this or `setState` to mutate state.
-   * You should treat `this.state` as immutable.
+   * Sets a subset of the props.
    *
-   * There is no guarantee that `this.state` will be immediately updated, so
-   * accessing `this.state` after calling this method may return the old value.
-   *
-   * @param {object} completeState Next state.
-   * @param {?function} callback Called after state is updated.
+   * @param {object} partialProps Subset of the next props.
+   * @param {?function} callback Called after props are updated.
    * @final
-   * @protected
+   * @public
+   * @deprecated
    */
-  replaceState: function(completeState, callback) {
-    validateLifeCycleOnReplaceState(this);
-    this._pendingState = completeState;
-    if (this._compositeLifeCycleState !== CompositeLifeCycle.MOUNTING) {
-      // If we're in a componentWillMount handler, don't enqueue a rerender
-      // because ReactUpdates assumes we're in a browser context (which is wrong
-      // for server rendering) and we're about to do a render anyway.
-      // TODO: The callback here is ignored when setState is called from
-      // componentWillMount. Either fix it or disallow doing so completely in
-      // favor of getInitialState.
-      ReactUpdates.enqueueUpdate(this, callback);
+  setProps: function(partialProps, callback) {
+    ReactUpdateQueue.enqueueSetProps(this, partialProps);
+    if (callback) {
+      ReactUpdateQueue.enqueueCallback(this, callback);
     }
   },
 
   /**
-   * Filters the context object to only contain keys specified in
-   * `contextTypes`, and asserts that they are valid.
+   * Replace all the props.
    *
-   * @param {object} context
-   * @return {?object}
-   * @private
-   */
-  _processContext: function(context) {
-    var maskedContext = null;
-    var contextTypes = this.constructor.contextTypes;
-    if (contextTypes) {
-      maskedContext = {};
-      for (var contextName in contextTypes) {
-        maskedContext[contextName] = context[contextName];
-      }
-      if ("production" !== process.env.NODE_ENV) {
-        this._checkPropTypes(
-          contextTypes,
-          maskedContext,
-          ReactPropTypeLocations.context
-        );
-      }
-    }
-    return maskedContext;
-  },
-
-  /**
-   * @param {object} currentContext
-   * @return {object}
-   * @private
-   */
-  _processChildContext: function(currentContext) {
-    var childContext = this.getChildContext && this.getChildContext();
-    var displayName = this.constructor.displayName || 'ReactCompositeComponent';
-    if (childContext) {
-      ("production" !== process.env.NODE_ENV ? invariant(
-        typeof this.constructor.childContextTypes === 'object',
-        '%s.getChildContext(): childContextTypes must be defined in order to ' +
-        'use getChildContext().',
-        displayName
-      ) : invariant(typeof this.constructor.childContextTypes === 'object'));
-      if ("production" !== process.env.NODE_ENV) {
-        this._checkPropTypes(
-          this.constructor.childContextTypes,
-          childContext,
-          ReactPropTypeLocations.childContext
-        );
-      }
-      for (var name in childContext) {
-        ("production" !== process.env.NODE_ENV ? invariant(
-          name in this.constructor.childContextTypes,
-          '%s.getChildContext(): key "%s" is not defined in childContextTypes.',
-          displayName,
-          name
-        ) : invariant(name in this.constructor.childContextTypes));
-      }
-      return assign({}, currentContext, childContext);
-    }
-    return currentContext;
-  },
-
-  /**
-   * Processes props by setting default values for unspecified props and
-   * asserting that the props are valid. Does not mutate its argument; returns
-   * a new props object with defaults merged in.
-   *
-   * @param {object} newProps
-   * @return {object}
-   * @private
-   */
-  _processProps: function(newProps) {
-    if ("production" !== process.env.NODE_ENV) {
-      var propTypes = this.constructor.propTypes;
-      if (propTypes) {
-        this._checkPropTypes(propTypes, newProps, ReactPropTypeLocations.prop);
-      }
-    }
-    return newProps;
-  },
-
-  /**
-   * Assert that the props are valid
-   *
-   * @param {object} propTypes Map of prop name to a ReactPropType
-   * @param {object} props
-   * @param {string} location e.g. "prop", "context", "child context"
-   * @private
-   */
-  _checkPropTypes: function(propTypes, props, location) {
-    // TODO: Stop validating prop types here and only use the element
-    // validation.
-    var componentName = this.constructor.displayName;
-    for (var propName in propTypes) {
-      if (propTypes.hasOwnProperty(propName)) {
-        var error =
-          propTypes[propName](props, propName, componentName, location);
-        if (error instanceof Error) {
-          // We may want to extend this logic for similar errors in
-          // renderComponent calls, so I'm abstracting it away into
-          // a function to minimize refactoring in the future
-          var addendum = getDeclarationErrorAddendum(this);
-          ("production" !== process.env.NODE_ENV ? warning(false, error.message + addendum) : null);
-        }
-      }
-    }
-  },
-
-  /**
-   * If any of `_pendingElement`, `_pendingState`, or `_pendingForceUpdate`
-   * is set, update the component.
-   *
-   * @param {ReactReconcileTransaction} transaction
-   * @internal
-   */
-  performUpdateIfNecessary: function(transaction) {
-    var compositeLifeCycleState = this._compositeLifeCycleState;
-    // Do not trigger a state transition if we are in the middle of mounting or
-    // receiving props because both of those will already be doing this.
-    if (compositeLifeCycleState === CompositeLifeCycle.MOUNTING ||
-        compositeLifeCycleState === CompositeLifeCycle.RECEIVING_PROPS) {
-      return;
-    }
-
-    if (this._pendingElement == null &&
-        this._pendingState == null &&
-        !this._pendingForceUpdate) {
-      return;
-    }
-
-    var nextContext = this.context;
-    var nextProps = this.props;
-    var nextElement = this._currentElement;
-    if (this._pendingElement != null) {
-      nextElement = this._pendingElement;
-      nextContext = this._processContext(nextElement._context);
-      nextProps = this._processProps(nextElement.props);
-      this._pendingElement = null;
-
-      this._compositeLifeCycleState = CompositeLifeCycle.RECEIVING_PROPS;
-      if (this.componentWillReceiveProps) {
-        this.componentWillReceiveProps(nextProps, nextContext);
-      }
-    }
-
-    this._compositeLifeCycleState = null;
-
-    var nextState = this._pendingState || this.state;
-    this._pendingState = null;
-
-    var shouldUpdate =
-      this._pendingForceUpdate ||
-      !this.shouldComponentUpdate ||
-      this.shouldComponentUpdate(nextProps, nextState, nextContext);
-
-    if ("production" !== process.env.NODE_ENV) {
-      if (typeof shouldUpdate === "undefined") {
-        console.warn(
-          (this.constructor.displayName || 'ReactCompositeComponent') +
-          '.shouldComponentUpdate(): Returned undefined instead of a ' +
-          'boolean value. Make sure to return true or false.'
-        );
-      }
-    }
-
-    if (shouldUpdate) {
-      this._pendingForceUpdate = false;
-      // Will set `this.props`, `this.state` and `this.context`.
-      this._performComponentUpdate(
-        nextElement,
-        nextProps,
-        nextState,
-        nextContext,
-        transaction
-      );
-    } else {
-      // If it's determined that a component should not update, we still want
-      // to set props and state.
-      this._currentElement = nextElement;
-      this.props = nextProps;
-      this.state = nextState;
-      this.context = nextContext;
-
-      // Owner cannot change because shouldUpdateReactComponent doesn't allow
-      // it. TODO: Remove this._owner completely.
-      this._owner = nextElement._owner;
-    }
-  },
-
-  /**
-   * Merges new props and state, notifies delegate methods of update and
-   * performs update.
-   *
-   * @param {ReactElement} nextElement Next element
-   * @param {object} nextProps Next public object to set as properties.
-   * @param {?object} nextState Next object to set as state.
-   * @param {?object} nextContext Next public object to set as context.
-   * @param {ReactReconcileTransaction} transaction
-   * @private
-   */
-  _performComponentUpdate: function(
-    nextElement,
-    nextProps,
-    nextState,
-    nextContext,
-    transaction
-  ) {
-    var prevElement = this._currentElement;
-    var prevProps = this.props;
-    var prevState = this.state;
-    var prevContext = this.context;
-
-    if (this.componentWillUpdate) {
-      this.componentWillUpdate(nextProps, nextState, nextContext);
-    }
-
-    this._currentElement = nextElement;
-    this.props = nextProps;
-    this.state = nextState;
-    this.context = nextContext;
-
-    // Owner cannot change because shouldUpdateReactComponent doesn't allow
-    // it. TODO: Remove this._owner completely.
-    this._owner = nextElement._owner;
-
-    this.updateComponent(
-      transaction,
-      prevElement
-    );
-
-    if (this.componentDidUpdate) {
-      transaction.getReactMountReady().enqueue(
-        this.componentDidUpdate.bind(this, prevProps, prevState, prevContext),
-        this
-      );
-    }
-  },
-
-  receiveComponent: function(nextElement, transaction) {
-    if (nextElement === this._currentElement &&
-        nextElement._owner != null) {
-      // Since elements are immutable after the owner is rendered,
-      // we can do a cheap identity compare here to determine if this is a
-      // superfluous reconcile. It's possible for state to be mutable but such
-      // change should trigger an update of the owner which would recreate
-      // the element. We explicitly check for the existence of an owner since
-      // it's possible for a element created outside a composite to be
-      // deeply mutated and reused.
-      return;
-    }
-
-    ReactComponent.Mixin.receiveComponent.call(
-      this,
-      nextElement,
-      transaction
-    );
-  },
-
-  /**
-   * Updates the component's currently mounted DOM representation.
-   *
-   * By default, this implements React's rendering and reconciliation algorithm.
-   * Sophisticated clients may wish to override this.
-   *
-   * @param {ReactReconcileTransaction} transaction
-   * @param {ReactElement} prevElement
-   * @internal
-   * @overridable
-   */
-  updateComponent: ReactPerf.measure(
-    'ReactCompositeComponent',
-    'updateComponent',
-    function(transaction, prevParentElement) {
-      ReactComponent.Mixin.updateComponent.call(
-        this,
-        transaction,
-        prevParentElement
-      );
-
-      var prevComponentInstance = this._renderedComponent;
-      var prevElement = prevComponentInstance._currentElement;
-      var nextElement = this._renderValidatedComponent();
-      if (shouldUpdateReactComponent(prevElement, nextElement)) {
-        prevComponentInstance.receiveComponent(nextElement, transaction);
-      } else {
-        // These two IDs are actually the same! But nothing should rely on that.
-        var thisID = this._rootNodeID;
-        var prevComponentID = prevComponentInstance._rootNodeID;
-        prevComponentInstance.unmountComponent();
-        this._renderedComponent = instantiateReactComponent(
-          nextElement,
-          this._currentElement.type
-        );
-        var nextMarkup = this._renderedComponent.mountComponent(
-          thisID,
-          transaction,
-          this._mountDepth + 1
-        );
-        ReactComponent.BackendIDOperations.dangerouslyReplaceNodeWithMarkupByID(
-          prevComponentID,
-          nextMarkup
-        );
-      }
-    }
-  ),
-
-  /**
-   * Forces an update. This should only be invoked when it is known with
-   * certainty that we are **not** in a DOM transaction.
-   *
-   * You may want to call this when you know that some deeper aspect of the
-   * component's state has changed but `setState` was not called.
-   *
-   * This will not invoke `shouldUpdateComponent`, but it will invoke
-   * `componentWillUpdate` and `componentDidUpdate`.
-   *
-   * @param {?function} callback Called after update is complete.
+   * @param {object} newProps Subset of the next props.
+   * @param {?function} callback Called after props are updated.
    * @final
-   * @protected
+   * @public
+   * @deprecated
    */
-  forceUpdate: function(callback) {
-    var compositeLifeCycleState = this._compositeLifeCycleState;
-    ("production" !== process.env.NODE_ENV ? invariant(
-      this.isMounted() ||
-        compositeLifeCycleState === CompositeLifeCycle.MOUNTING,
-      'forceUpdate(...): Can only force an update on mounted or mounting ' +
-        'components.'
-    ) : invariant(this.isMounted() ||
-      compositeLifeCycleState === CompositeLifeCycle.MOUNTING));
-    ("production" !== process.env.NODE_ENV ? invariant(
-      compositeLifeCycleState !== CompositeLifeCycle.UNMOUNTING &&
-      ReactCurrentOwner.current == null,
-      'forceUpdate(...): Cannot force an update while unmounting component ' +
-      'or within a `render` function.'
-    ) : invariant(compositeLifeCycleState !== CompositeLifeCycle.UNMOUNTING &&
-    ReactCurrentOwner.current == null));
-    this._pendingForceUpdate = true;
-    ReactUpdates.enqueueUpdate(this, callback);
-  },
-
-  /**
-   * @private
-   */
-  _renderValidatedComponent: ReactPerf.measure(
-    'ReactCompositeComponent',
-    '_renderValidatedComponent',
-    function() {
-      var renderedComponent;
-      var previousContext = ReactContext.current;
-      ReactContext.current = this._processChildContext(
-        this._currentElement._context
-      );
-      ReactCurrentOwner.current = this;
-      try {
-        renderedComponent = this.render();
-        if (renderedComponent === null || renderedComponent === false) {
-          renderedComponent = ReactEmptyComponent.getEmptyComponent();
-          ReactEmptyComponent.registerNullComponentID(this._rootNodeID);
-        } else {
-          ReactEmptyComponent.deregisterNullComponentID(this._rootNodeID);
-        }
-      } finally {
-        ReactContext.current = previousContext;
-        ReactCurrentOwner.current = null;
-      }
-      ("production" !== process.env.NODE_ENV ? invariant(
-        ReactElement.isValidElement(renderedComponent),
-        '%s.render(): A valid ReactComponent must be returned. You may have ' +
-          'returned undefined, an array or some other invalid object.',
-        this.constructor.displayName || 'ReactCompositeComponent'
-      ) : invariant(ReactElement.isValidElement(renderedComponent)));
-      return renderedComponent;
+  replaceProps: function(newProps, callback) {
+    ReactUpdateQueue.enqueueReplaceProps(this, newProps);
+    if (callback) {
+      ReactUpdateQueue.enqueueCallback(this, callback);
     }
-  ),
-
-  /**
-   * @private
-   */
-  _bindAutoBindMethods: function() {
-    for (var autoBindKey in this.__reactAutoBindMap) {
-      if (!this.__reactAutoBindMap.hasOwnProperty(autoBindKey)) {
-        continue;
-      }
-      var method = this.__reactAutoBindMap[autoBindKey];
-      this[autoBindKey] = this._bindAutoBindMethod(ReactErrorUtils.guard(
-        method,
-        this.constructor.displayName + '.' + autoBindKey
-      ));
-    }
-  },
-
-  /**
-   * Binds a method to the component.
-   *
-   * @param {function} method Method to be bound.
-   * @private
-   */
-  _bindAutoBindMethod: function(method) {
-    var component = this;
-    var boundMethod = method.bind(component);
-    if ("production" !== process.env.NODE_ENV) {
-      boundMethod.__reactBoundContext = component;
-      boundMethod.__reactBoundMethod = method;
-      boundMethod.__reactBoundArguments = null;
-      var componentName = component.constructor.displayName;
-      var _bind = boundMethod.bind;
-      boundMethod.bind = function(newThis ) {for (var args=[],$__0=1,$__1=arguments.length;$__0<$__1;$__0++) args.push(arguments[$__0]);
-        // User is trying to bind() an autobound method; we effectively will
-        // ignore the value of "this" that the user is trying to use, so
-        // let's warn.
-        if (newThis !== component && newThis !== null) {
-          monitorCodeUse('react_bind_warning', { component: componentName });
-          console.warn(
-            'bind(): React component methods may only be bound to the ' +
-            'component instance. See ' + componentName
-          );
-        } else if (!args.length) {
-          monitorCodeUse('react_bind_warning', { component: componentName });
-          console.warn(
-            'bind(): You are binding a component method to the component. ' +
-            'React does this for you automatically in a high-performance ' +
-            'way, so you can safely remove this call. See ' + componentName
-          );
-          return boundMethod;
-        }
-        var reboundMethod = _bind.apply(boundMethod, arguments);
-        reboundMethod.__reactBoundContext = component;
-        reboundMethod.__reactBoundMethod = method;
-        reboundMethod.__reactBoundArguments = args;
-        return reboundMethod;
-      };
-    }
-    return boundMethod;
   }
 };
 
-var ReactCompositeComponentBase = function() {};
+var ReactClassComponent = function() {};
 assign(
-  ReactCompositeComponentBase.prototype,
-  ReactComponent.Mixin,
-  ReactOwner.Mixin,
-  ReactPropTransferer.Mixin,
-  ReactCompositeComponentMixin
+  ReactClassComponent.prototype,
+  ReactComponent.prototype,
+  ReactClassMixin
 );
 
 /**
  * Module for creating composite components.
  *
- * @class ReactCompositeComponent
- * @extends ReactComponent
- * @extends ReactOwner
- * @extends ReactPropTransferer
+ * @class ReactClass
  */
-var ReactCompositeComponent = {
-
-  LifeCycle: CompositeLifeCycle,
-
-  Base: ReactCompositeComponentBase,
+var ReactClass = {
 
   /**
    * Creates a composite component class given a class specification.
@@ -6875,12 +6073,41 @@ var ReactCompositeComponent = {
    * @public
    */
   createClass: function(spec) {
-    var Constructor = function(props) {
+    var Constructor = function(props, context) {
       // This constructor is overridden by mocks. The argument is used
-      // by mocks to assert on what gets mounted. This will later be used
-      // by the stand-alone class implementation.
+      // by mocks to assert on what gets mounted.
+
+      // Wire up auto-binding
+      if (this.__reactAutoBindMap) {
+        bindAutoBindMethods(this);
+      }
+
+      this.props = props;
+      this.context = context;
+      this.state = null;
+
+      // ReactClasses doesn't have constructors. Instead, they use the
+      // getInitialState and componentWillMount methods for initialization.
+
+      var initialState = this.getInitialState ? this.getInitialState() : null;
+      if ("production" !== process.env.NODE_ENV) {
+        // We allow auto-mocks to proceed as if they're returning null.
+        if (typeof initialState === 'undefined' &&
+            this.getInitialState._isMockFunction) {
+          // This is probably bad practice. Consider warning here and
+          // deprecating this convenience.
+          initialState = null;
+        }
+      }
+      ("production" !== process.env.NODE_ENV ? invariant(
+        typeof initialState === 'object' && !Array.isArray(initialState),
+        '%s.getInitialState(): must return an object or null',
+        Constructor.displayName || 'ReactCompositeComponent'
+      ) : invariant(typeof initialState === 'object' && !Array.isArray(initialState)));
+
+      this.state = initialState;
     };
-    Constructor.prototype = new ReactCompositeComponentBase();
+    Constructor.prototype = new ReactClassComponent();
     Constructor.prototype.constructor = Constructor;
 
     injectedMixins.forEach(
@@ -6892,6 +6119,19 @@ var ReactCompositeComponent = {
     // Initialize the defaultProps property after all mixins have been merged
     if (Constructor.getDefaultProps) {
       Constructor.defaultProps = Constructor.getDefaultProps();
+    }
+
+    if ("production" !== process.env.NODE_ENV) {
+      // This is a tag to indicate that the use of these method names is ok,
+      // since it's used with createClass. If it's not, then it's likely a
+      // mistake so we'll warn you to use the static property, property
+      // initializer or constructor respectively.
+      if (Constructor.getDefaultProps) {
+        Constructor.getDefaultProps.isReactClassApproved = {};
+      }
+      if (Constructor.prototype.getInitialState) {
+        Constructor.prototype.getInitialState.isReactClassApproved = {};
+      }
     }
 
     ("production" !== process.env.NODE_ENV ? invariant(
@@ -6910,25 +6150,26 @@ var ReactCompositeComponent = {
           'componentShouldUpdate(). Did you mean shouldComponentUpdate()? ' +
           'The name is phrased as a question because the function is ' +
           'expected to return a value.'
-         );
+        );
       }
     }
 
     // Reduce time spent doing lookups by setting these on the prototype.
-    for (var methodName in ReactCompositeComponentInterface) {
+    for (var methodName in ReactClassInterface) {
       if (!Constructor.prototype[methodName]) {
         Constructor.prototype[methodName] = null;
       }
     }
 
+    // Legacy hook
+    Constructor.type = Constructor;
     if ("production" !== process.env.NODE_ENV) {
-      return ReactLegacyElement.wrapFactory(
-        ReactElementValidator.createFactory(Constructor)
-      );
+      if (Object.defineProperty) {
+        Object.defineProperty(Constructor, 'type', typeDeprecationDescriptor);
+      }
     }
-    return ReactLegacyElement.wrapFactory(
-      ReactElement.createFactory(Constructor)
-    );
+
+    return Constructor;
   },
 
   injection: {
@@ -6936,12 +6177,1082 @@ var ReactCompositeComponent = {
       injectedMixins.push(mixin);
     }
   }
+
+};
+
+module.exports = ReactClass;
+
+}).call(this,require('_process'))
+},{"./Object.assign":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/Object.assign.js","./ReactComponent":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactComponent.js","./ReactElement":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactElement.js","./ReactErrorUtils":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactErrorUtils.js","./ReactInstanceMap":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactInstanceMap.js","./ReactLifeCycle":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactLifeCycle.js","./ReactPropTypeLocationNames":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactPropTypeLocationNames.js","./ReactPropTypeLocations":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactPropTypeLocations.js","./ReactUpdateQueue":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactUpdateQueue.js","./invariant":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/invariant.js","./keyMirror":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/keyMirror.js","./keyOf":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/keyOf.js","./monitorCodeUse":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/monitorCodeUse.js","./warning":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/warning.js","_process":"/Users/sahat/Projects/trip-planner/node_modules/browserify/node_modules/process/browser.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactComponent.js":[function(require,module,exports){
+(function (process){
+/**
+ * Copyright 2013-2014, Facebook, Inc.
+ * All rights reserved.
+ *
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
+ *
+ * @providesModule ReactComponent
+ */
+
+'use strict';
+
+var ReactUpdateQueue = require("./ReactUpdateQueue");
+
+var invariant = require("./invariant");
+var warning = require("./warning");
+
+/**
+ * Base class helpers for the updating state of a component.
+ */
+function ReactComponent(props, context) {
+  this.props = props;
+  this.context = context;
+}
+
+/**
+ * Sets a subset of the state. Always use this to mutate
+ * state. You should treat `this.state` as immutable.
+ *
+ * There is no guarantee that `this.state` will be immediately updated, so
+ * accessing `this.state` after calling this method may return the old value.
+ *
+ * There is no guarantee that calls to `setState` will run synchronously,
+ * as they may eventually be batched together.  You can provide an optional
+ * callback that will be executed when the call to setState is actually
+ * completed.
+ *
+ * @param {object} partialState Next partial state to be merged with state.
+ * @param {?function} callback Called after state is updated.
+ * @final
+ * @protected
+ */
+ReactComponent.prototype.setState = function(partialState, callback) {
+  ("production" !== process.env.NODE_ENV ? invariant(
+    typeof partialState === 'object' || partialState == null,
+    'setState(...): takes an object of state variables to update.'
+  ) : invariant(typeof partialState === 'object' || partialState == null));
+  if ("production" !== process.env.NODE_ENV) {
+    ("production" !== process.env.NODE_ENV ? warning(
+      partialState != null,
+      'setState(...): You passed an undefined or null state object; ' +
+      'instead, use forceUpdate().'
+    ) : null);
+  }
+  ReactUpdateQueue.enqueueSetState(this, partialState);
+  if (callback) {
+    ReactUpdateQueue.enqueueCallback(this, callback);
+  }
+};
+
+/**
+ * Forces an update. This should only be invoked when it is known with
+ * certainty that we are **not** in a DOM transaction.
+ *
+ * You may want to call this when you know that some deeper aspect of the
+ * component's state has changed but `setState` was not called.
+ *
+ * This will not invoke `shouldUpdateComponent`, but it will invoke
+ * `componentWillUpdate` and `componentDidUpdate`.
+ *
+ * @param {?function} callback Called after update is complete.
+ * @final
+ * @protected
+ */
+ReactComponent.prototype.forceUpdate = function(callback) {
+  ReactUpdateQueue.enqueueForceUpdate(this);
+  if (callback) {
+    ReactUpdateQueue.enqueueCallback(this, callback);
+  }
+};
+
+/**
+ * Deprecated APIs. These APIs used to exist on classic React classes but since
+ * we would like to deprecate them, we're not going to move them over to this
+ * modern base class. Instead, we define a getter that warns if it's accessed.
+ */
+if ("production" !== process.env.NODE_ENV) {
+  if (Object.defineProperty) {
+    var deprecatedAPIs = {
+      getDOMNode: 'getDOMNode',
+      isMounted: 'isMounted',
+      replaceState: 'replaceState',
+      setProps: 'setProps'
+    };
+    var defineDeprecationWarning = function(methodName, displayName) {
+      Object.defineProperty(ReactComponent.prototype, methodName, {
+        get: function() {
+          ("production" !== process.env.NODE_ENV ? warning(
+            false,
+            '%s(...) is deprecated in plain JavaScript React classes.',
+            displayName
+          ) : null);
+          return undefined;
+        }
+      });
+    };
+    for (var methodName in deprecatedAPIs) {
+      if (deprecatedAPIs.hasOwnProperty(methodName)) {
+        defineDeprecationWarning(methodName, deprecatedAPIs[methodName]);
+      }
+    }
+  }
+}
+
+module.exports = ReactComponent;
+
+}).call(this,require('_process'))
+},{"./ReactUpdateQueue":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactUpdateQueue.js","./invariant":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/invariant.js","./warning":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/warning.js","_process":"/Users/sahat/Projects/trip-planner/node_modules/browserify/node_modules/process/browser.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactComponentBrowserEnvironment.js":[function(require,module,exports){
+/**
+ * Copyright 2013-2014, Facebook, Inc.
+ * All rights reserved.
+ *
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
+ *
+ * @providesModule ReactComponentBrowserEnvironment
+ */
+
+/*jslint evil: true */
+
+'use strict';
+
+var ReactDOMIDOperations = require("./ReactDOMIDOperations");
+var ReactMount = require("./ReactMount");
+
+/**
+ * Abstracts away all functionality of the reconciler that requires knowledge of
+ * the browser context. TODO: These callers should be refactored to avoid the
+ * need for this injection.
+ */
+var ReactComponentBrowserEnvironment = {
+
+  processChildrenUpdates:
+    ReactDOMIDOperations.dangerouslyProcessChildrenUpdates,
+
+  replaceNodeWithMarkupByID:
+    ReactDOMIDOperations.dangerouslyReplaceNodeWithMarkupByID,
+
+  /**
+   * If a particular environment requires that some resources be cleaned up,
+   * specify this in the injected Mixin. In the DOM, we would likely want to
+   * purge any cached node ID lookups.
+   *
+   * @private
+   */
+  unmountIDFromEnvironment: function(rootNodeID) {
+    ReactMount.purgeID(rootNodeID);
+  }
+
+};
+
+module.exports = ReactComponentBrowserEnvironment;
+
+},{"./ReactDOMIDOperations":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactDOMIDOperations.js","./ReactMount":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactMount.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactComponentEnvironment.js":[function(require,module,exports){
+(function (process){
+/**
+ * Copyright 2014, Facebook, Inc.
+ * All rights reserved.
+ *
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
+ *
+ * @providesModule ReactComponentEnvironment
+ */
+
+'use strict';
+
+var invariant = require("./invariant");
+
+var injected = false;
+
+var ReactComponentEnvironment = {
+
+  /**
+   * Optionally injectable environment dependent cleanup hook. (server vs.
+   * browser etc). Example: A browser system caches DOM nodes based on component
+   * ID and must remove that cache entry when this instance is unmounted.
+   */
+  unmountIDFromEnvironment: null,
+
+  /**
+   * Optionally injectable hook for swapping out mount images in the middle of
+   * the tree.
+   */
+  replaceNodeWithMarkupByID: null,
+
+  /**
+   * Optionally injectable hook for processing a queue of child updates. Will
+   * later move into MultiChildComponents.
+   */
+  processChildrenUpdates: null,
+
+  injection: {
+    injectEnvironment: function(environment) {
+      ("production" !== process.env.NODE_ENV ? invariant(
+        !injected,
+        'ReactCompositeComponent: injectEnvironment() can only be called once.'
+      ) : invariant(!injected));
+      ReactComponentEnvironment.unmountIDFromEnvironment =
+        environment.unmountIDFromEnvironment;
+      ReactComponentEnvironment.replaceNodeWithMarkupByID =
+        environment.replaceNodeWithMarkupByID;
+      ReactComponentEnvironment.processChildrenUpdates =
+        environment.processChildrenUpdates;
+      injected = true;
+    }
+  }
+
+};
+
+module.exports = ReactComponentEnvironment;
+
+}).call(this,require('_process'))
+},{"./invariant":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/invariant.js","_process":"/Users/sahat/Projects/trip-planner/node_modules/browserify/node_modules/process/browser.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactCompositeComponent.js":[function(require,module,exports){
+(function (process){
+/**
+ * Copyright 2013-2014, Facebook, Inc.
+ * All rights reserved.
+ *
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
+ *
+ * @providesModule ReactCompositeComponent
+ */
+
+'use strict';
+
+var ReactComponentEnvironment = require("./ReactComponentEnvironment");
+var ReactContext = require("./ReactContext");
+var ReactCurrentOwner = require("./ReactCurrentOwner");
+var ReactElement = require("./ReactElement");
+var ReactElementValidator = require("./ReactElementValidator");
+var ReactInstanceMap = require("./ReactInstanceMap");
+var ReactLifeCycle = require("./ReactLifeCycle");
+var ReactNativeComponent = require("./ReactNativeComponent");
+var ReactPerf = require("./ReactPerf");
+var ReactPropTypeLocations = require("./ReactPropTypeLocations");
+var ReactPropTypeLocationNames = require("./ReactPropTypeLocationNames");
+var ReactReconciler = require("./ReactReconciler");
+var ReactUpdates = require("./ReactUpdates");
+
+var assign = require("./Object.assign");
+var emptyObject = require("./emptyObject");
+var invariant = require("./invariant");
+var shouldUpdateReactComponent = require("./shouldUpdateReactComponent");
+var warning = require("./warning");
+
+function getDeclarationErrorAddendum(component) {
+  var owner = component._currentElement._owner || null;
+  if (owner) {
+    var name = owner.getName();
+    if (name) {
+      return ' Check the render method of `' + name + '`.';
+    }
+  }
+  return '';
+}
+
+/**
+ * ------------------ The Life-Cycle of a Composite Component ------------------
+ *
+ * - constructor: Initialization of state. The instance is now retained.
+ *   - componentWillMount
+ *   - render
+ *   - [children's constructors]
+ *     - [children's componentWillMount and render]
+ *     - [children's componentDidMount]
+ *     - componentDidMount
+ *
+ *       Update Phases:
+ *       - componentWillReceiveProps (only called if parent updated)
+ *       - shouldComponentUpdate
+ *         - componentWillUpdate
+ *           - render
+ *           - [children's constructors or receive props phases]
+ *         - componentDidUpdate
+ *
+ *     - componentWillUnmount
+ *     - [children's componentWillUnmount]
+ *   - [children destroyed]
+ * - (destroyed): The instance is now blank, released by React and ready for GC.
+ *
+ * -----------------------------------------------------------------------------
+ */
+
+/**
+ * An incrementing ID assigned to each component when it is mounted. This is
+ * used to enforce the order in which `ReactUpdates` updates dirty components.
+ *
+ * @private
+ */
+var nextMountID = 1;
+
+/**
+ * @lends {ReactCompositeComponent.prototype}
+ */
+var ReactCompositeComponentMixin = {
+
+  /**
+   * Base constructor for all composite component.
+   *
+   * @param {ReactElement} element
+   * @final
+   * @internal
+   */
+  construct: function(element) {
+    this._currentElement = element;
+    this._rootNodeID = null;
+    this._instance = null;
+
+    // See ReactUpdateQueue
+    this._pendingElement = null;
+    this._pendingState = null;
+    this._pendingForceUpdate = false;
+
+    this._renderedComponent = null;
+
+    this._context = null;
+    this._mountOrder = 0;
+    this._isTopLevel = false;
+
+    // See ReactUpdates and ReactUpdateQueue.
+    this._pendingCallbacks = null;
+  },
+
+  /**
+   * Initializes the component, renders markup, and registers event listeners.
+   *
+   * @param {string} rootID DOM ID of the root node.
+   * @param {ReactReconcileTransaction|ReactServerRenderingTransaction} transaction
+   * @return {?string} Rendered markup to be inserted into the DOM.
+   * @final
+   * @internal
+   */
+  mountComponent: function(rootID, transaction, context) {
+    this._context = context;
+    this._mountOrder = nextMountID++;
+    this._rootNodeID = rootID;
+
+    var publicProps = this._processProps(this._currentElement.props);
+    var publicContext = this._processContext(this._currentElement._context);
+
+    var Component = ReactNativeComponent.getComponentClassForElement(
+      this._currentElement
+    );
+
+    // Initialize the public class
+    var inst = new Component(publicProps, publicContext);
+    // These should be set up in the constructor, but as a convenience for
+    // simpler class abstractions, we set them up after the fact.
+    inst.props = publicProps;
+    inst.context = publicContext;
+    inst.refs = emptyObject;
+
+    this._instance = inst;
+
+    // Store a reference from the instance back to the internal representation
+    ReactInstanceMap.set(inst, this);
+
+    if ("production" !== process.env.NODE_ENV) {
+      this._warnIfContextsDiffer(this._currentElement._context, context);
+    }
+
+    if ("production" !== process.env.NODE_ENV) {
+      // Since plain JS classes are defined without any special initialization
+      // logic, we can not catch common errors early. Therefore, we have to
+      // catch them here, at initialization time, instead.
+      ("production" !== process.env.NODE_ENV ? warning(
+        !inst.getInitialState ||
+        inst.getInitialState.isReactClassApproved,
+        'getInitialState was defined on %s, a plain JavaScript class. ' +
+        'This is only supported for classes created using React.createClass. ' +
+        'Did you mean to define a state property instead?',
+        this.getName() || 'a component'
+      ) : null);
+      ("production" !== process.env.NODE_ENV ? warning(
+        !inst.propTypes,
+        'propTypes was defined as an instance property on %s. Use a static ' +
+        'property to define propTypes instead.',
+        this.getName() || 'a component'
+      ) : null);
+      ("production" !== process.env.NODE_ENV ? warning(
+        !inst.contextTypes,
+        'contextTypes was defined as an instance property on %s. Use a ' +
+        'static property to define contextTypes instead.',
+        this.getName() || 'a component'
+      ) : null);
+      ("production" !== process.env.NODE_ENV ? warning(
+        typeof inst.componentShouldUpdate !== 'function',
+        '%s has a method called ' +
+        'componentShouldUpdate(). Did you mean shouldComponentUpdate()? ' +
+        'The name is phrased as a question because the function is ' +
+        'expected to return a value.',
+        (this.getName() || 'A component')
+      ) : null);
+    }
+
+    var initialState = inst.state;
+    if (initialState === undefined) {
+      inst.state = initialState = null;
+    }
+    ("production" !== process.env.NODE_ENV ? invariant(
+      typeof initialState === 'object' && !Array.isArray(initialState),
+      '%s.state: must be set to an object or null',
+      this.getName() || 'ReactCompositeComponent'
+    ) : invariant(typeof initialState === 'object' && !Array.isArray(initialState)));
+
+    this._pendingState = null;
+    this._pendingForceUpdate = false;
+
+    if (inst.componentWillMount) {
+      var previouslyMounting = ReactLifeCycle.currentlyMountingInstance;
+      ReactLifeCycle.currentlyMountingInstance = this;
+      try {
+        inst.componentWillMount();
+      } finally {
+        ReactLifeCycle.currentlyMountingInstance = previouslyMounting;
+      }
+      // When mounting, calls to `setState` by `componentWillMount` will set
+      // `this._pendingState` without triggering a re-render.
+      if (this._pendingState) {
+        inst.state = this._pendingState;
+        this._pendingState = null;
+      }
+    }
+
+    var renderedElement = this._renderValidatedComponent();
+    this._renderedComponent = this._instantiateReactComponent(
+      renderedElement,
+      this._currentElement.type // The wrapping type
+    );
+
+    var markup = ReactReconciler.mountComponent(
+      this._renderedComponent,
+      rootID,
+      transaction,
+      this._processChildContext(context)
+    );
+    if (inst.componentDidMount) {
+      transaction.getReactMountReady().enqueue(inst.componentDidMount, inst);
+    }
+
+    return markup;
+  },
+
+  /**
+   * Releases any resources allocated by `mountComponent`.
+   *
+   * @final
+   * @internal
+   */
+  unmountComponent: function() {
+    var inst = this._instance;
+
+    if (inst.componentWillUnmount) {
+      var previouslyUnmounting = ReactLifeCycle.currentlyUnmountingInstance;
+      ReactLifeCycle.currentlyUnmountingInstance = this;
+      try {
+        inst.componentWillUnmount();
+      } finally {
+        ReactLifeCycle.currentlyUnmountingInstance = previouslyUnmounting;
+      }
+    }
+
+    ReactReconciler.unmountComponent(this._renderedComponent);
+    this._renderedComponent = null;
+
+    // Reset pending fields
+    this._pendingState = null;
+    this._pendingForceUpdate = false;
+    this._pendingCallbacks = null;
+    this._pendingElement = null;
+
+    ReactComponentEnvironment.unmountIDFromEnvironment(this._rootNodeID);
+
+    // These fields do not really need to be reset since this object is no
+    // longer accessible.
+    this._context = null;
+    this._rootNodeID = null;
+
+    // Delete the reference from the instance to this internal representation
+    // which allow the internals to be properly cleaned up even if the user
+    // leaks a reference to the public instance.
+    ReactInstanceMap.remove(inst);
+
+    // Some existing components rely on inst.props even after they've been
+    // destroyed (in event handlers).
+    // TODO: inst.props = null;
+    // TODO: inst.state = null;
+    // TODO: inst.context = null;
+  },
+
+  /**
+   * Schedule a partial update to the props. Only used for internal testing.
+   *
+   * @param {object} partialProps Subset of the next props.
+   * @param {?function} callback Called after props are updated.
+   * @final
+   * @internal
+   */
+  _setPropsInternal: function(partialProps, callback) {
+    // This is a deoptimized path. We optimize for always having an element.
+    // This creates an extra internal element.
+    var element = this._pendingElement || this._currentElement;
+    this._pendingElement = ReactElement.cloneAndReplaceProps(
+      element,
+      assign({}, element.props, partialProps)
+    );
+    ReactUpdates.enqueueUpdate(this, callback);
+  },
+
+  /**
+   * Filters the context object to only contain keys specified in
+   * `contextTypes`
+   *
+   * @param {object} context
+   * @return {?object}
+   * @private
+   */
+  _maskContext: function(context) {
+    var maskedContext = null;
+    // This really should be getting the component class for the element,
+    // but we know that we're not going to need it for built-ins.
+    if (typeof this._currentElement.type === 'string') {
+      return emptyObject;
+    }
+    var contextTypes = this._currentElement.type.contextTypes;
+    if (!contextTypes) {
+      return emptyObject;
+    }
+    maskedContext = {};
+    for (var contextName in contextTypes) {
+      maskedContext[contextName] = context[contextName];
+    }
+    return maskedContext;
+  },
+
+  /**
+   * Filters the context object to only contain keys specified in
+   * `contextTypes`, and asserts that they are valid.
+   *
+   * @param {object} context
+   * @return {?object}
+   * @private
+   */
+  _processContext: function(context) {
+    var maskedContext = this._maskContext(context);
+    if ("production" !== process.env.NODE_ENV) {
+      var Component = ReactNativeComponent.getComponentClassForElement(
+        this._currentElement
+      );
+      if (Component.contextTypes) {
+        this._checkPropTypes(
+          Component.contextTypes,
+          maskedContext,
+          ReactPropTypeLocations.context
+        );
+      }
+    }
+    return maskedContext;
+  },
+
+  /**
+   * @param {object} currentContext
+   * @return {object}
+   * @private
+   */
+  _processChildContext: function(currentContext) {
+    var inst = this._instance;
+    var childContext = inst.getChildContext && inst.getChildContext();
+    if (childContext) {
+      ("production" !== process.env.NODE_ENV ? invariant(
+        typeof inst.constructor.childContextTypes === 'object',
+        '%s.getChildContext(): childContextTypes must be defined in order to ' +
+        'use getChildContext().',
+        this.getName() || 'ReactCompositeComponent'
+      ) : invariant(typeof inst.constructor.childContextTypes === 'object'));
+      if ("production" !== process.env.NODE_ENV) {
+        this._checkPropTypes(
+          inst.constructor.childContextTypes,
+          childContext,
+          ReactPropTypeLocations.childContext
+        );
+      }
+      for (var name in childContext) {
+        ("production" !== process.env.NODE_ENV ? invariant(
+          name in inst.constructor.childContextTypes,
+          '%s.getChildContext(): key "%s" is not defined in childContextTypes.',
+          this.getName() || 'ReactCompositeComponent',
+          name
+        ) : invariant(name in inst.constructor.childContextTypes));
+      }
+      return assign({}, currentContext, childContext);
+    }
+    return currentContext;
+  },
+
+  /**
+   * Processes props by setting default values for unspecified props and
+   * asserting that the props are valid. Does not mutate its argument; returns
+   * a new props object with defaults merged in.
+   *
+   * @param {object} newProps
+   * @return {object}
+   * @private
+   */
+  _processProps: function(newProps) {
+    if ("production" !== process.env.NODE_ENV) {
+      var Component = ReactNativeComponent.getComponentClassForElement(
+        this._currentElement
+      );
+      if (Component.propTypes) {
+        this._checkPropTypes(
+          Component.propTypes,
+          newProps,
+          ReactPropTypeLocations.prop
+        );
+      }
+    }
+    return newProps;
+  },
+
+  /**
+   * Assert that the props are valid
+   *
+   * @param {object} propTypes Map of prop name to a ReactPropType
+   * @param {object} props
+   * @param {string} location e.g. "prop", "context", "child context"
+   * @private
+   */
+  _checkPropTypes: function(propTypes, props, location) {
+    // TODO: Stop validating prop types here and only use the element
+    // validation.
+    var componentName = this.getName();
+    for (var propName in propTypes) {
+      if (propTypes.hasOwnProperty(propName)) {
+        var error;
+        try {
+          // This is intentionally an invariant that gets caught. It's the same
+          // behavior as without this statement except with a better message.
+          ("production" !== process.env.NODE_ENV ? invariant(
+            typeof propTypes[propName] === 'function',
+            '%s: %s type `%s` is invalid; it must be a function, usually ' +
+            'from React.PropTypes.',
+            componentName || 'React class',
+            ReactPropTypeLocationNames[location],
+            propName
+          ) : invariant(typeof propTypes[propName] === 'function'));
+          error = propTypes[propName](props, propName, componentName, location);
+        } catch (ex) {
+          error = ex;
+        }
+        if (error instanceof Error) {
+          // We may want to extend this logic for similar errors in
+          // React.render calls, so I'm abstracting it away into
+          // a function to minimize refactoring in the future
+          var addendum = getDeclarationErrorAddendum(this);
+
+          if (location === ReactPropTypeLocations.prop) {
+            // Preface gives us something to blacklist in warning module
+            var preface = 'Failed CompositeComponent proptype check. ';
+            ("production" !== process.env.NODE_ENV ? warning(false, preface + error.message + addendum) : null);
+          } else {
+            ("production" !== process.env.NODE_ENV ? warning(false, error.message + addendum) : null);
+          }
+        }
+      }
+    }
+  },
+
+  receiveComponent: function(nextElement, transaction, nextContext) {
+    var prevElement = this._currentElement;
+    var prevContext = this._context;
+
+    this._pendingElement = null;
+
+    this.updateComponent(
+      transaction,
+      prevElement,
+      nextElement,
+      prevContext,
+      nextContext
+    );
+  },
+
+  /**
+   * If any of `_pendingElement`, `_pendingState`, or `_pendingForceUpdate`
+   * is set, update the component.
+   *
+   * @param {ReactReconcileTransaction} transaction
+   * @internal
+   */
+  performUpdateIfNecessary: function(transaction) {
+    if (this._pendingElement != null) {
+      ReactReconciler.receiveComponent(
+        this,
+        this._pendingElement || this._currentElement,
+        transaction,
+        this._context
+      );
+    }
+
+    if (this._pendingState != null || this._pendingForceUpdate) {
+      if ("production" !== process.env.NODE_ENV) {
+        ReactElementValidator.checkAndWarnForMutatedProps(
+          this._currentElement
+        );
+      }
+
+      this.updateComponent(
+        transaction,
+        this._currentElement,
+        this._currentElement,
+        this._context,
+        this._context
+      );
+    }
+  },
+
+  /**
+   * Compare two contexts, warning if they are different
+   * TODO: Remove this check when owner-context is removed
+   */
+   _warnIfContextsDiffer: function(ownerBasedContext, parentBasedContext) {
+    ownerBasedContext = this._maskContext(ownerBasedContext);
+    parentBasedContext = this._maskContext(parentBasedContext);
+    var parentKeys = Object.keys(parentBasedContext).sort();
+    var displayName = this.getName() || 'ReactCompositeComponent';
+    for (var i = 0; i < parentKeys.length; i++) {
+      var key = parentKeys[i];
+      ("production" !== process.env.NODE_ENV ? warning(
+        ownerBasedContext[key] === parentBasedContext[key],
+        'owner-based and parent-based contexts differ '  +
+        '(values: `%s` vs `%s`) for key (%s) while mounting %s ' +
+        '(see: http://fb.me/react-context-by-parent)',
+        ownerBasedContext[key],
+        parentBasedContext[key],
+        key,
+        displayName
+      ) : null);
+    }
+  },
+
+  /**
+   * Perform an update to a mounted component. The componentWillReceiveProps and
+   * shouldComponentUpdate methods are called, then (assuming the update isn't
+   * skipped) the remaining update lifecycle methods are called and the DOM
+   * representation is updated.
+   *
+   * By default, this implements React's rendering and reconciliation algorithm.
+   * Sophisticated clients may wish to override this.
+   *
+   * @param {ReactReconcileTransaction} transaction
+   * @param {ReactElement} prevParentElement
+   * @param {ReactElement} nextParentElement
+   * @internal
+   * @overridable
+   */
+  updateComponent: function(
+    transaction,
+    prevParentElement,
+    nextParentElement,
+    prevUnmaskedContext,
+    nextUnmaskedContext
+  ) {
+    var inst = this._instance;
+
+    var prevContext = inst.context;
+    var prevProps = inst.props;
+    var nextContext = prevContext;
+    var nextProps = prevProps;
+
+    // Distinguish between a props update versus a simple state update
+    if (prevParentElement !== nextParentElement) {
+      nextContext = this._processContext(nextParentElement._context);
+      nextProps = this._processProps(nextParentElement.props);
+
+      if ("production" !== process.env.NODE_ENV) {
+        if (nextUnmaskedContext != null) {
+          this._warnIfContextsDiffer(nextParentElement._context, nextUnmaskedContext);
+        }
+      }
+
+      // An update here will schedule an update but immediately set
+      // _pendingState which will ensure that any state updates gets
+      // immediately reconciled instead of waiting for the next batch.
+
+      if (inst.componentWillReceiveProps) {
+        inst.componentWillReceiveProps(nextProps, nextContext);
+      }
+    }
+
+    var nextState = this._pendingState || inst.state;
+    this._pendingState = null;
+
+    var shouldUpdate =
+      this._pendingForceUpdate ||
+      !inst.shouldComponentUpdate ||
+      inst.shouldComponentUpdate(nextProps, nextState, nextContext);
+
+    if ("production" !== process.env.NODE_ENV) {
+      if (typeof shouldUpdate === 'undefined') {
+        console.warn(
+          (this.getName() || 'ReactCompositeComponent') +
+          '.shouldComponentUpdate(): Returned undefined instead of a ' +
+          'boolean value. Make sure to return true or false.'
+        );
+      }
+    }
+
+    if (shouldUpdate) {
+      this._pendingForceUpdate = false;
+      // Will set `this.props`, `this.state` and `this.context`.
+      this._performComponentUpdate(
+        nextParentElement,
+        nextProps,
+        nextState,
+        nextContext,
+        transaction,
+        nextUnmaskedContext
+      );
+    } else {
+      // If it's determined that a component should not update, we still want
+      // to set props and state but we shortcut the rest of the update.
+      this._currentElement = nextParentElement;
+      this._context = nextUnmaskedContext;
+      inst.props = nextProps;
+      inst.state = nextState;
+      inst.context = nextContext;
+    }
+  },
+
+  /**
+   * Merges new props and state, notifies delegate methods of update and
+   * performs update.
+   *
+   * @param {ReactElement} nextElement Next element
+   * @param {object} nextProps Next public object to set as properties.
+   * @param {?object} nextState Next object to set as state.
+   * @param {?object} nextContext Next public object to set as context.
+   * @param {ReactReconcileTransaction} transaction
+   * @param {?object} unmaskedContext
+   * @private
+   */
+  _performComponentUpdate: function(
+    nextElement,
+    nextProps,
+    nextState,
+    nextContext,
+    transaction,
+    unmaskedContext
+  ) {
+    var inst = this._instance;
+
+    var prevElement = this._currentElement;
+    var prevProps = inst.props;
+    var prevState = inst.state;
+    var prevContext = inst.context;
+
+    if (inst.componentWillUpdate) {
+      inst.componentWillUpdate(nextProps, nextState, nextContext);
+    }
+
+    this._currentElement = nextElement;
+    this._context = unmaskedContext;
+    inst.props = nextProps;
+    inst.state = nextState;
+    inst.context = nextContext;
+
+    this._updateRenderedComponent(transaction, unmaskedContext);
+
+    if (inst.componentDidUpdate) {
+      transaction.getReactMountReady().enqueue(
+        inst.componentDidUpdate.bind(inst, prevProps, prevState, prevContext),
+        inst
+      );
+    }
+  },
+
+  /**
+   * Call the component's `render` method and update the DOM accordingly.
+   *
+   * @param {ReactReconcileTransaction} transaction
+   * @internal
+   */
+  _updateRenderedComponent: function(transaction, context) {
+    var prevComponentInstance = this._renderedComponent;
+    var prevRenderedElement = prevComponentInstance._currentElement;
+    var nextRenderedElement = this._renderValidatedComponent();
+    if (shouldUpdateReactComponent(prevRenderedElement, nextRenderedElement)) {
+      ReactReconciler.receiveComponent(
+        prevComponentInstance,
+        nextRenderedElement,
+        transaction,
+        this._processChildContext(context)
+      );
+    } else {
+      // These two IDs are actually the same! But nothing should rely on that.
+      var thisID = this._rootNodeID;
+      var prevComponentID = prevComponentInstance._rootNodeID;
+      ReactReconciler.unmountComponent(prevComponentInstance);
+
+      this._renderedComponent = this._instantiateReactComponent(
+        nextRenderedElement,
+        this._currentElement.type
+      );
+      var nextMarkup = ReactReconciler.mountComponent(
+        this._renderedComponent,
+        thisID,
+        transaction,
+        context
+      );
+      this._replaceNodeWithMarkupByID(prevComponentID, nextMarkup);
+    }
+  },
+
+  /**
+   * @protected
+   */
+  _replaceNodeWithMarkupByID: function(prevComponentID, nextMarkup) {
+    ReactComponentEnvironment.replaceNodeWithMarkupByID(
+      prevComponentID,
+      nextMarkup
+    );
+  },
+
+  /**
+   * @protected
+   */
+  _renderValidatedComponentWithoutOwnerOrContext: function() {
+    var inst = this._instance;
+    var renderedComponent = inst.render();
+    if ("production" !== process.env.NODE_ENV) {
+      // We allow auto-mocks to proceed as if they're returning null.
+      if (typeof renderedComponent === 'undefined' &&
+          inst.render._isMockFunction) {
+        // This is probably bad practice. Consider warning here and
+        // deprecating this convenience.
+        renderedComponent = null;
+      }
+    }
+
+    return renderedComponent;
+  },
+
+  /**
+   * @private
+   */
+  _renderValidatedComponent: function() {
+    var renderedComponent;
+    var previousContext = ReactContext.current;
+    ReactContext.current = this._processChildContext(
+      this._currentElement._context
+    );
+    ReactCurrentOwner.current = this;
+    try {
+      renderedComponent =
+        this._renderValidatedComponentWithoutOwnerOrContext();
+    } finally {
+      ReactContext.current = previousContext;
+      ReactCurrentOwner.current = null;
+    }
+    ("production" !== process.env.NODE_ENV ? invariant(
+      // TODO: An `isValidNode` function would probably be more appropriate
+      renderedComponent === null || renderedComponent === false ||
+      ReactElement.isValidElement(renderedComponent),
+      '%s.render(): A valid ReactComponent must be returned. You may have ' +
+        'returned undefined, an array or some other invalid object.',
+      this.getName() || 'ReactCompositeComponent'
+    ) : invariant(// TODO: An `isValidNode` function would probably be more appropriate
+    renderedComponent === null || renderedComponent === false ||
+    ReactElement.isValidElement(renderedComponent)));
+    return renderedComponent;
+  },
+
+  /**
+   * Lazily allocates the refs object and stores `component` as `ref`.
+   *
+   * @param {string} ref Reference name.
+   * @param {component} component Component to store as `ref`.
+   * @final
+   * @private
+   */
+  attachRef: function(ref, component) {
+    var inst = this.getPublicInstance();
+    var refs = inst.refs === emptyObject ? (inst.refs = {}) : inst.refs;
+    refs[ref] = component.getPublicInstance();
+  },
+
+  /**
+   * Detaches a reference name.
+   *
+   * @param {string} ref Name to dereference.
+   * @final
+   * @private
+   */
+  detachRef: function(ref) {
+    var refs = this.getPublicInstance().refs;
+    delete refs[ref];
+  },
+
+  /**
+   * Get a text description of the component that can be used to identify it
+   * in error messages.
+   * @return {string} The name or null.
+   * @internal
+   */
+  getName: function() {
+    var type = this._currentElement.type;
+    var constructor = this._instance && this._instance.constructor;
+    return (
+      type.displayName || (constructor && constructor.displayName) ||
+      type.name || (constructor && constructor.name) ||
+      null
+    );
+  },
+
+  /**
+   * Get the publicly accessible representation of this component - i.e. what
+   * is exposed by refs and returned by React.render. Can be null for stateless
+   * components.
+   *
+   * @return {ReactComponent} the public component instance.
+   * @internal
+   */
+  getPublicInstance: function() {
+    return this._instance;
+  },
+
+  // Stub
+  _instantiateReactComponent: null
+
+};
+
+ReactPerf.measureMethods(
+  ReactCompositeComponentMixin,
+  'ReactCompositeComponent',
+  {
+    mountComponent: 'mountComponent',
+    updateComponent: 'updateComponent',
+    _renderValidatedComponent: '_renderValidatedComponent'
+  }
+);
+
+var ReactCompositeComponent = {
+
+  Mixin: ReactCompositeComponentMixin
+
 };
 
 module.exports = ReactCompositeComponent;
 
 }).call(this,require('_process'))
-},{"./Object.assign":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/Object.assign.js","./ReactComponent":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactComponent.js","./ReactContext":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactContext.js","./ReactCurrentOwner":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactCurrentOwner.js","./ReactElement":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactElement.js","./ReactElementValidator":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactElementValidator.js","./ReactEmptyComponent":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactEmptyComponent.js","./ReactErrorUtils":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactErrorUtils.js","./ReactLegacyElement":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactLegacyElement.js","./ReactOwner":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactOwner.js","./ReactPerf":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactPerf.js","./ReactPropTransferer":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactPropTransferer.js","./ReactPropTypeLocationNames":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactPropTypeLocationNames.js","./ReactPropTypeLocations":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactPropTypeLocations.js","./ReactUpdates":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactUpdates.js","./instantiateReactComponent":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/instantiateReactComponent.js","./invariant":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/invariant.js","./keyMirror":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/keyMirror.js","./keyOf":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/keyOf.js","./mapObject":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/mapObject.js","./monitorCodeUse":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/monitorCodeUse.js","./shouldUpdateReactComponent":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/shouldUpdateReactComponent.js","./warning":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/warning.js","_process":"/Users/sahat/Projects/trip-planner/node_modules/browserify/node_modules/process/browser.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactContext.js":[function(require,module,exports){
+},{"./Object.assign":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/Object.assign.js","./ReactComponentEnvironment":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactComponentEnvironment.js","./ReactContext":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactContext.js","./ReactCurrentOwner":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactCurrentOwner.js","./ReactElement":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactElement.js","./ReactElementValidator":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactElementValidator.js","./ReactInstanceMap":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactInstanceMap.js","./ReactLifeCycle":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactLifeCycle.js","./ReactNativeComponent":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactNativeComponent.js","./ReactPerf":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactPerf.js","./ReactPropTypeLocationNames":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactPropTypeLocationNames.js","./ReactPropTypeLocations":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactPropTypeLocations.js","./ReactReconciler":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactReconciler.js","./ReactUpdates":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactUpdates.js","./emptyObject":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/emptyObject.js","./invariant":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/invariant.js","./shouldUpdateReactComponent":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/shouldUpdateReactComponent.js","./warning":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/warning.js","_process":"/Users/sahat/Projects/trip-planner/node_modules/browserify/node_modules/process/browser.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactContext.js":[function(require,module,exports){
 /**
  * Copyright 2013-2014, Facebook, Inc.
  * All rights reserved.
@@ -6953,9 +7264,11 @@ module.exports = ReactCompositeComponent;
  * @providesModule ReactContext
  */
 
-"use strict";
+'use strict';
 
 var assign = require("./Object.assign");
+var emptyObject = require("./emptyObject");
+var monitorCodeUse = require("./monitorCodeUse");
 
 /**
  * Keeps track of the current context.
@@ -6969,7 +7282,7 @@ var ReactContext = {
    * @internal
    * @type {object}
    */
-  current: {},
+  current: emptyObject,
 
   /**
    * Temporarily extends the current context while executing scopedCallback.
@@ -6988,6 +7301,8 @@ var ReactContext = {
    * @return {ReactComponent|array<ReactComponent>}
    */
   withContext: function(newContext, scopedCallback) {
+    monitorCodeUse('react_with_context', {newContext: newContext});
+
     var result;
     var previousContext = ReactContext.current;
     ReactContext.current = assign({}, previousContext, newContext);
@@ -7003,7 +7318,7 @@ var ReactContext = {
 
 module.exports = ReactContext;
 
-},{"./Object.assign":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/Object.assign.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactCurrentOwner.js":[function(require,module,exports){
+},{"./Object.assign":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/Object.assign.js","./emptyObject":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/emptyObject.js","./monitorCodeUse":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/monitorCodeUse.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactCurrentOwner.js":[function(require,module,exports){
 /**
  * Copyright 2013-2014, Facebook, Inc.
  * All rights reserved.
@@ -7015,7 +7330,7 @@ module.exports = ReactContext;
  * @providesModule ReactCurrentOwner
  */
 
-"use strict";
+'use strict';
 
 /**
  * Keeps track of the current owner.
@@ -7051,11 +7366,10 @@ module.exports = ReactCurrentOwner;
  * @typechecks static-only
  */
 
-"use strict";
+'use strict';
 
 var ReactElement = require("./ReactElement");
 var ReactElementValidator = require("./ReactElementValidator");
-var ReactLegacyElement = require("./ReactLegacyElement");
 
 var mapObject = require("./mapObject");
 
@@ -7067,13 +7381,9 @@ var mapObject = require("./mapObject");
  */
 function createDOMFactory(tag) {
   if ("production" !== process.env.NODE_ENV) {
-    return ReactLegacyElement.markNonLegacyFactory(
-      ReactElementValidator.createFactory(tag)
-    );
+    return ReactElementValidator.createFactory(tag);
   }
-  return ReactLegacyElement.markNonLegacyFactory(
-    ReactElement.createFactory(tag)
-  );
+  return ReactElement.createFactory(tag);
 }
 
 /**
@@ -7220,7 +7530,7 @@ var ReactDOM = mapObject({
 module.exports = ReactDOM;
 
 }).call(this,require('_process'))
-},{"./ReactElement":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactElement.js","./ReactElementValidator":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactElementValidator.js","./ReactLegacyElement":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactLegacyElement.js","./mapObject":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/mapObject.js","_process":"/Users/sahat/Projects/trip-planner/node_modules/browserify/node_modules/process/browser.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactDOMButton.js":[function(require,module,exports){
+},{"./ReactElement":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactElement.js","./ReactElementValidator":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactElementValidator.js","./mapObject":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/mapObject.js","_process":"/Users/sahat/Projects/trip-planner/node_modules/browserify/node_modules/process/browser.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactDOMButton.js":[function(require,module,exports){
 /**
  * Copyright 2013-2014, Facebook, Inc.
  * All rights reserved.
@@ -7232,18 +7542,16 @@ module.exports = ReactDOM;
  * @providesModule ReactDOMButton
  */
 
-"use strict";
+'use strict';
 
 var AutoFocusMixin = require("./AutoFocusMixin");
 var ReactBrowserComponentMixin = require("./ReactBrowserComponentMixin");
-var ReactCompositeComponent = require("./ReactCompositeComponent");
+var ReactClass = require("./ReactClass");
 var ReactElement = require("./ReactElement");
-var ReactDOM = require("./ReactDOM");
 
 var keyMirror = require("./keyMirror");
 
-// Store a reference to the <button> `ReactDOMComponent`. TODO: use string
-var button = ReactElement.createFactory(ReactDOM.button.type);
+var button = ReactElement.createFactory('button');
 
 var mouseListenerNames = keyMirror({
   onClick: true,
@@ -7262,8 +7570,9 @@ var mouseListenerNames = keyMirror({
  * Implements a <button> native component that does not receive mouse events
  * when `disabled` is set.
  */
-var ReactDOMButton = ReactCompositeComponent.createClass({
+var ReactDOMButton = ReactClass.createClass({
   displayName: 'ReactDOMButton',
+  tagName: 'BUTTON',
 
   mixins: [AutoFocusMixin, ReactBrowserComponentMixin],
 
@@ -7285,7 +7594,7 @@ var ReactDOMButton = ReactCompositeComponent.createClass({
 
 module.exports = ReactDOMButton;
 
-},{"./AutoFocusMixin":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/AutoFocusMixin.js","./ReactBrowserComponentMixin":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactBrowserComponentMixin.js","./ReactCompositeComponent":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactCompositeComponent.js","./ReactDOM":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactDOM.js","./ReactElement":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactElement.js","./keyMirror":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/keyMirror.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactDOMComponent.js":[function(require,module,exports){
+},{"./AutoFocusMixin":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/AutoFocusMixin.js","./ReactBrowserComponentMixin":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactBrowserComponentMixin.js","./ReactClass":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactClass.js","./ReactElement":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactElement.js","./keyMirror":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/keyMirror.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactDOMComponent.js":[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2014, Facebook, Inc.
@@ -7299,13 +7608,13 @@ module.exports = ReactDOMButton;
  * @typechecks static-only
  */
 
-"use strict";
+/* global hasOwnProperty:true */
+
+'use strict';
 
 var CSSPropertyOperations = require("./CSSPropertyOperations");
 var DOMProperty = require("./DOMProperty");
 var DOMPropertyOperations = require("./DOMPropertyOperations");
-var ReactBrowserComponentMixin = require("./ReactBrowserComponentMixin");
-var ReactComponent = require("./ReactComponent");
 var ReactBrowserEventEmitter = require("./ReactBrowserEventEmitter");
 var ReactMount = require("./ReactMount");
 var ReactMultiChild = require("./ReactMultiChild");
@@ -7317,6 +7626,7 @@ var invariant = require("./invariant");
 var isEventSupported = require("./isEventSupported");
 var keyOf = require("./keyOf");
 var monitorCodeUse = require("./monitorCodeUse");
+var warning = require("./warning");
 
 var deleteListener = ReactBrowserEventEmitter.deleteListener;
 var listenTo = ReactBrowserEventEmitter.listenTo;
@@ -7330,6 +7640,11 @@ var STYLE = keyOf({style: null});
 var ELEMENT_NODE_TYPE = 1;
 
 /**
+ * Optionally injectable operations for mutating the DOM
+ */
+var BackendIDOperations = null;
+
+/**
  * @param {?object} props
  */
 function assertValidProps(props) {
@@ -7337,24 +7652,37 @@ function assertValidProps(props) {
     return;
   }
   // Note the use of `==` which checks for null or undefined.
-  ("production" !== process.env.NODE_ENV ? invariant(
-    props.children == null || props.dangerouslySetInnerHTML == null,
-    'Can only set one of `children` or `props.dangerouslySetInnerHTML`.'
-  ) : invariant(props.children == null || props.dangerouslySetInnerHTML == null));
+  if (props.dangerouslySetInnerHTML != null) {
+    ("production" !== process.env.NODE_ENV ? invariant(
+      props.children == null,
+      'Can only set one of `children` or `props.dangerouslySetInnerHTML`.'
+    ) : invariant(props.children == null));
+    ("production" !== process.env.NODE_ENV ? invariant(
+      props.dangerouslySetInnerHTML.__html != null,
+      '`props.dangerouslySetInnerHTML` must be in the form `{__html: ...}`. ' +
+      'Please visit http://fb.me/react-invariant-dangerously-set-inner-html for more information.'
+    ) : invariant(props.dangerouslySetInnerHTML.__html != null));
+  }
   if ("production" !== process.env.NODE_ENV) {
+    ("production" !== process.env.NODE_ENV ? warning(
+      props.innerHTML == null,
+      'Directly setting property `innerHTML` is not permitted. ' +
+      'For more information, lookup documentation on `dangerouslySetInnerHTML`.'
+    ) : null);
     if (props.contentEditable && props.children != null) {
       console.warn(
         'A component is `contentEditable` and contains `children` managed by ' +
-        'React. It is now your responsibility to guarantee that none of those '+
-        'nodes are unexpectedly modified or duplicated. This is probably not ' +
-        'intentional.'
+        'React. It is now your responsibility to guarantee that none of ' +
+        'those nodes are unexpectedly modified or duplicated. This is ' +
+        'probably not intentional.'
       );
     }
   }
   ("production" !== process.env.NODE_ENV ? invariant(
     props.style == null || typeof props.style === 'object',
     'The `style` prop expects a mapping from style properties to values, ' +
-    'not a string.'
+    'not a string. For example, style={{marginRight: spacing + \'em\'}} when ' +
+    'using JSX.'
   ) : invariant(props.style == null || typeof props.style === 'object'));
 }
 
@@ -7431,18 +7759,23 @@ function validateDangerousTag(tag) {
  * object mapping of style properties to values.
  *
  * @constructor ReactDOMComponent
- * @extends ReactComponent
  * @extends ReactMultiChild
  */
 function ReactDOMComponent(tag) {
   validateDangerousTag(tag);
   this._tag = tag;
-  this.tagName = tag.toUpperCase();
+  this._renderedChildren = null;
+  this._previousStyleCopy = null;
+  this._rootNodeID = null;
 }
 
 ReactDOMComponent.displayName = 'ReactDOMComponent';
 
 ReactDOMComponent.Mixin = {
+
+  construct: function(element) {
+    this._currentElement = element;
+  },
 
   /**
    * Generates root tag markup then recurses. This method has side effects and
@@ -7451,28 +7784,18 @@ ReactDOMComponent.Mixin = {
    * @internal
    * @param {string} rootID The root DOM ID for this node.
    * @param {ReactReconcileTransaction|ReactServerRenderingTransaction} transaction
-   * @param {number} mountDepth number of components in the owner hierarchy
    * @return {string} The computed markup.
    */
-  mountComponent: ReactPerf.measure(
-    'ReactDOMComponent',
-    'mountComponent',
-    function(rootID, transaction, mountDepth) {
-      ReactComponent.Mixin.mountComponent.call(
-        this,
-        rootID,
-        transaction,
-        mountDepth
-      );
-      assertValidProps(this.props);
-      var closeTag = omittedCloseTags[this._tag] ? '' : '</' + this._tag + '>';
-      return (
-        this._createOpenTagMarkupAndPutListeners(transaction) +
-        this._createContentMarkup(transaction) +
-        closeTag
-      );
-    }
-  ),
+  mountComponent: function(rootID, transaction, context) {
+    this._rootNodeID = rootID;
+    assertValidProps(this._currentElement.props);
+    var closeTag = omittedCloseTags[this._tag] ? '' : '</' + this._tag + '>';
+    return (
+      this._createOpenTagMarkupAndPutListeners(transaction) +
+      this._createContentMarkup(transaction, context) +
+      closeTag
+    );
+  },
 
   /**
    * Creates markup for the open tag and all attributes.
@@ -7487,7 +7810,7 @@ ReactDOMComponent.Mixin = {
    * @return {string} Markup of opening tag.
    */
   _createOpenTagMarkupAndPutListeners: function(transaction) {
-    var props = this.props;
+    var props = this._currentElement.props;
     var ret = '<' + this._tag;
 
     for (var propKey in props) {
@@ -7503,7 +7826,7 @@ ReactDOMComponent.Mixin = {
       } else {
         if (propKey === STYLE) {
           if (propValue) {
-            propValue = props.style = assign({}, props.style);
+            propValue = this._previousStyleCopy = assign({}, props.style);
           }
           propValue = CSSPropertyOperations.createMarkupForStyles(propValue);
         }
@@ -7530,50 +7853,50 @@ ReactDOMComponent.Mixin = {
    *
    * @private
    * @param {ReactReconcileTransaction|ReactServerRenderingTransaction} transaction
+   * @param {object} context
    * @return {string} Content markup.
    */
-  _createContentMarkup: function(transaction) {
+  _createContentMarkup: function(transaction, context) {
+    var prefix = '';
+    if (this._tag === 'listing' ||
+        this._tag === 'pre' ||
+        this._tag === 'textarea') {
+      // Add an initial newline because browsers ignore the first newline in
+      // a <listing>, <pre>, or <textarea> as an "authoring convenience" -- see
+      // https://html.spec.whatwg.org/multipage/syntax.html#parsing-main-inbody.
+      prefix = '\n';
+    }
+
+    var props = this._currentElement.props;
+
     // Intentional use of != to avoid catching zero/false.
-    var innerHTML = this.props.dangerouslySetInnerHTML;
+    var innerHTML = props.dangerouslySetInnerHTML;
     if (innerHTML != null) {
       if (innerHTML.__html != null) {
-        return innerHTML.__html;
+        return prefix + innerHTML.__html;
       }
     } else {
       var contentToUse =
-        CONTENT_TYPES[typeof this.props.children] ? this.props.children : null;
-      var childrenToUse = contentToUse != null ? null : this.props.children;
+        CONTENT_TYPES[typeof props.children] ? props.children : null;
+      var childrenToUse = contentToUse != null ? null : props.children;
       if (contentToUse != null) {
-        return escapeTextForBrowser(contentToUse);
+        return prefix + escapeTextForBrowser(contentToUse);
       } else if (childrenToUse != null) {
         var mountImages = this.mountChildren(
           childrenToUse,
-          transaction
+          transaction,
+          context
         );
-        return mountImages.join('');
+        return prefix + mountImages.join('');
       }
     }
-    return '';
+    return prefix;
   },
 
-  receiveComponent: function(nextElement, transaction) {
-    if (nextElement === this._currentElement &&
-        nextElement._owner != null) {
-      // Since elements are immutable after the owner is rendered,
-      // we can do a cheap identity compare here to determine if this is a
-      // superfluous reconcile. It's possible for state to be mutable but such
-      // change should trigger an update of the owner which would recreate
-      // the element. We explicitly check for the existence of an owner since
-      // it's possible for a element created outside a composite to be
-      // deeply mutated and reused.
-      return;
-    }
-
-    ReactComponent.Mixin.receiveComponent.call(
-      this,
-      nextElement,
-      transaction
-    );
+  receiveComponent: function(nextElement, transaction, context) {
+    var prevElement = this._currentElement;
+    this._currentElement = nextElement;
+    this.updateComponent(transaction, prevElement, nextElement, context);
   },
 
   /**
@@ -7582,23 +7905,15 @@ ReactDOMComponent.Mixin = {
    *
    * @param {ReactReconcileTransaction} transaction
    * @param {ReactElement} prevElement
+   * @param {ReactElement} nextElement
    * @internal
    * @overridable
    */
-  updateComponent: ReactPerf.measure(
-    'ReactDOMComponent',
-    'updateComponent',
-    function(transaction, prevElement) {
-      assertValidProps(this._currentElement.props);
-      ReactComponent.Mixin.updateComponent.call(
-        this,
-        transaction,
-        prevElement
-      );
-      this._updateDOMProperties(prevElement.props, transaction);
-      this._updateDOMChildren(prevElement.props, transaction);
-    }
-  ),
+  updateComponent: function(transaction, prevElement, nextElement, context) {
+    assertValidProps(this._currentElement.props);
+    this._updateDOMProperties(prevElement.props, transaction);
+    this._updateDOMChildren(prevElement.props, transaction, context);
+  },
 
   /**
    * Reconciles the properties by detecting differences in property values and
@@ -7616,7 +7931,7 @@ ReactDOMComponent.Mixin = {
    * @param {ReactReconcileTransaction} transaction
    */
   _updateDOMProperties: function(lastProps, transaction) {
-    var nextProps = this.props;
+    var nextProps = this._currentElement.props;
     var propKey;
     var styleName;
     var styleUpdates;
@@ -7626,7 +7941,7 @@ ReactDOMComponent.Mixin = {
         continue;
       }
       if (propKey === STYLE) {
-        var lastStyle = lastProps[propKey];
+        var lastStyle = this._previousStyleCopy;
         for (styleName in lastStyle) {
           if (lastStyle.hasOwnProperty(styleName)) {
             styleUpdates = styleUpdates || {};
@@ -7638,7 +7953,7 @@ ReactDOMComponent.Mixin = {
       } else if (
           DOMProperty.isStandardName[propKey] ||
           DOMProperty.isCustomAttribute(propKey)) {
-        ReactComponent.BackendIDOperations.deletePropertyByID(
+        BackendIDOperations.deletePropertyByID(
           this._rootNodeID,
           propKey
         );
@@ -7646,13 +7961,15 @@ ReactDOMComponent.Mixin = {
     }
     for (propKey in nextProps) {
       var nextProp = nextProps[propKey];
-      var lastProp = lastProps[propKey];
+      var lastProp = propKey === STYLE ?
+        this._previousStyleCopy :
+        lastProps[propKey];
       if (!nextProps.hasOwnProperty(propKey) || nextProp === lastProp) {
         continue;
       }
       if (propKey === STYLE) {
         if (nextProp) {
-          nextProp = nextProps.style = assign({}, nextProp);
+          nextProp = this._previousStyleCopy = assign({}, nextProp);
         }
         if (lastProp) {
           // Unset styles on `lastProp` but not on `nextProp`.
@@ -7680,7 +7997,7 @@ ReactDOMComponent.Mixin = {
       } else if (
           DOMProperty.isStandardName[propKey] ||
           DOMProperty.isCustomAttribute(propKey)) {
-        ReactComponent.BackendIDOperations.updatePropertyByID(
+        BackendIDOperations.updatePropertyByID(
           this._rootNodeID,
           propKey,
           nextProp
@@ -7688,7 +8005,7 @@ ReactDOMComponent.Mixin = {
       }
     }
     if (styleUpdates) {
-      ReactComponent.BackendIDOperations.updateStylesByID(
+      BackendIDOperations.updateStylesByID(
         this._rootNodeID,
         styleUpdates
       );
@@ -7702,8 +8019,8 @@ ReactDOMComponent.Mixin = {
    * @param {object} lastProps
    * @param {ReactReconcileTransaction} transaction
    */
-  _updateDOMChildren: function(lastProps, transaction) {
-    var nextProps = this.props;
+  _updateDOMChildren: function(lastProps, transaction, context) {
+    var nextProps = this._currentElement.props;
 
     var lastContent =
       CONTENT_TYPES[typeof lastProps.children] ? lastProps.children : null;
@@ -7726,7 +8043,7 @@ ReactDOMComponent.Mixin = {
     var lastHasContentOrHtml = lastContent != null || lastHtml != null;
     var nextHasContentOrHtml = nextContent != null || nextHtml != null;
     if (lastChildren != null && nextChildren == null) {
-      this.updateChildren(null, transaction);
+      this.updateChildren(null, transaction, context);
     } else if (lastHasContentOrHtml && !nextHasContentOrHtml) {
       this.updateTextContent('');
     }
@@ -7737,13 +8054,13 @@ ReactDOMComponent.Mixin = {
       }
     } else if (nextHtml != null) {
       if (lastHtml !== nextHtml) {
-        ReactComponent.BackendIDOperations.updateInnerHTMLByID(
+        BackendIDOperations.updateInnerHTMLByID(
           this._rootNodeID,
           nextHtml
         );
       }
     } else if (nextChildren != null) {
-      this.updateChildren(nextChildren, transaction);
+      this.updateChildren(nextChildren, transaction, context);
     }
   },
 
@@ -7756,23 +8073,33 @@ ReactDOMComponent.Mixin = {
   unmountComponent: function() {
     this.unmountChildren();
     ReactBrowserEventEmitter.deleteAllListeners(this._rootNodeID);
-    ReactComponent.Mixin.unmountComponent.call(this);
+    ReactMount.purgeID(this._rootNodeID);
+    this._rootNodeID = null;
   }
 
 };
 
+ReactPerf.measureMethods(ReactDOMComponent, 'ReactDOMComponent', {
+  mountComponent: 'mountComponent',
+  updateComponent: 'updateComponent'
+});
+
 assign(
   ReactDOMComponent.prototype,
-  ReactComponent.Mixin,
   ReactDOMComponent.Mixin,
-  ReactMultiChild.Mixin,
-  ReactBrowserComponentMixin
+  ReactMultiChild.Mixin
 );
+
+ReactDOMComponent.injection = {
+  injectIDOperations: function(IDOperations) {
+    ReactDOMComponent.BackendIDOperations = BackendIDOperations = IDOperations;
+  }
+};
 
 module.exports = ReactDOMComponent;
 
 }).call(this,require('_process'))
-},{"./CSSPropertyOperations":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/CSSPropertyOperations.js","./DOMProperty":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/DOMProperty.js","./DOMPropertyOperations":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/DOMPropertyOperations.js","./Object.assign":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/Object.assign.js","./ReactBrowserComponentMixin":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactBrowserComponentMixin.js","./ReactBrowserEventEmitter":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactBrowserEventEmitter.js","./ReactComponent":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactComponent.js","./ReactMount":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactMount.js","./ReactMultiChild":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactMultiChild.js","./ReactPerf":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactPerf.js","./escapeTextForBrowser":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/escapeTextForBrowser.js","./invariant":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/invariant.js","./isEventSupported":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/isEventSupported.js","./keyOf":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/keyOf.js","./monitorCodeUse":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/monitorCodeUse.js","_process":"/Users/sahat/Projects/trip-planner/node_modules/browserify/node_modules/process/browser.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactDOMForm.js":[function(require,module,exports){
+},{"./CSSPropertyOperations":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/CSSPropertyOperations.js","./DOMProperty":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/DOMProperty.js","./DOMPropertyOperations":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/DOMPropertyOperations.js","./Object.assign":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/Object.assign.js","./ReactBrowserEventEmitter":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactBrowserEventEmitter.js","./ReactMount":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactMount.js","./ReactMultiChild":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactMultiChild.js","./ReactPerf":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactPerf.js","./escapeTextForBrowser":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/escapeTextForBrowser.js","./invariant":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/invariant.js","./isEventSupported":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/isEventSupported.js","./keyOf":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/keyOf.js","./monitorCodeUse":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/monitorCodeUse.js","./warning":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/warning.js","_process":"/Users/sahat/Projects/trip-planner/node_modules/browserify/node_modules/process/browser.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactDOMForm.js":[function(require,module,exports){
 /**
  * Copyright 2013-2014, Facebook, Inc.
  * All rights reserved.
@@ -7784,17 +8111,15 @@ module.exports = ReactDOMComponent;
  * @providesModule ReactDOMForm
  */
 
-"use strict";
+'use strict';
 
 var EventConstants = require("./EventConstants");
 var LocalEventTrapMixin = require("./LocalEventTrapMixin");
 var ReactBrowserComponentMixin = require("./ReactBrowserComponentMixin");
-var ReactCompositeComponent = require("./ReactCompositeComponent");
+var ReactClass = require("./ReactClass");
 var ReactElement = require("./ReactElement");
-var ReactDOM = require("./ReactDOM");
 
-// Store a reference to the <form> `ReactDOMComponent`. TODO: use string
-var form = ReactElement.createFactory(ReactDOM.form.type);
+var form = ReactElement.createFactory('form');
 
 /**
  * Since onSubmit doesn't bubble OR capture on the top level in IE8, we need
@@ -7802,8 +8127,9 @@ var form = ReactElement.createFactory(ReactDOM.form.type);
  * do to accomplish this, but the most reliable is to make <form> a
  * composite component and use `componentDidMount` to attach the event handlers.
  */
-var ReactDOMForm = ReactCompositeComponent.createClass({
+var ReactDOMForm = ReactClass.createClass({
   displayName: 'ReactDOMForm',
+  tagName: 'FORM',
 
   mixins: [ReactBrowserComponentMixin, LocalEventTrapMixin],
 
@@ -7822,7 +8148,7 @@ var ReactDOMForm = ReactCompositeComponent.createClass({
 
 module.exports = ReactDOMForm;
 
-},{"./EventConstants":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/EventConstants.js","./LocalEventTrapMixin":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/LocalEventTrapMixin.js","./ReactBrowserComponentMixin":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactBrowserComponentMixin.js","./ReactCompositeComponent":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactCompositeComponent.js","./ReactDOM":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactDOM.js","./ReactElement":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactElement.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactDOMIDOperations.js":[function(require,module,exports){
+},{"./EventConstants":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/EventConstants.js","./LocalEventTrapMixin":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/LocalEventTrapMixin.js","./ReactBrowserComponentMixin":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactBrowserComponentMixin.js","./ReactClass":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactClass.js","./ReactElement":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactElement.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactDOMIDOperations.js":[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2014, Facebook, Inc.
@@ -7838,7 +8164,7 @@ module.exports = ReactDOMForm;
 
 /*jslint evil: true */
 
-"use strict";
+'use strict';
 
 var CSSPropertyOperations = require("./CSSPropertyOperations");
 var DOMChildrenOperations = require("./DOMChildrenOperations");
@@ -7863,7 +8189,7 @@ var INVALID_PROPERTY_ERRORS = {
 
 /**
  * Operations used to process updates to DOM nodes. This is made injectable via
- * `ReactComponent.BackendIDOperations`.
+ * `ReactDOMComponent.BackendIDOperations`.
  */
 var ReactDOMIDOperations = {
 
@@ -7876,27 +8202,23 @@ var ReactDOMIDOperations = {
    * @param {*} value New value of the property.
    * @internal
    */
-  updatePropertyByID: ReactPerf.measure(
-    'ReactDOMIDOperations',
-    'updatePropertyByID',
-    function(id, name, value) {
-      var node = ReactMount.getNode(id);
-      ("production" !== process.env.NODE_ENV ? invariant(
-        !INVALID_PROPERTY_ERRORS.hasOwnProperty(name),
-        'updatePropertyByID(...): %s',
-        INVALID_PROPERTY_ERRORS[name]
-      ) : invariant(!INVALID_PROPERTY_ERRORS.hasOwnProperty(name)));
+  updatePropertyByID: function(id, name, value) {
+    var node = ReactMount.getNode(id);
+    ("production" !== process.env.NODE_ENV ? invariant(
+      !INVALID_PROPERTY_ERRORS.hasOwnProperty(name),
+      'updatePropertyByID(...): %s',
+      INVALID_PROPERTY_ERRORS[name]
+    ) : invariant(!INVALID_PROPERTY_ERRORS.hasOwnProperty(name)));
 
-      // If we're updating to null or undefined, we should remove the property
-      // from the DOM node instead of inadvertantly setting to a string. This
-      // brings us in line with the same behavior we have on initial render.
-      if (value != null) {
-        DOMPropertyOperations.setValueForProperty(node, name, value);
-      } else {
-        DOMPropertyOperations.deleteValueForProperty(node, name);
-      }
+    // If we're updating to null or undefined, we should remove the property
+    // from the DOM node instead of inadvertantly setting to a string. This
+    // brings us in line with the same behavior we have on initial render.
+    if (value != null) {
+      DOMPropertyOperations.setValueForProperty(node, name, value);
+    } else {
+      DOMPropertyOperations.deleteValueForProperty(node, name);
     }
-  ),
+  },
 
   /**
    * Updates a DOM node to remove a property. This should only be used to remove
@@ -7906,19 +8228,15 @@ var ReactDOMIDOperations = {
    * @param {string} name A property name to remove, see `DOMProperty`.
    * @internal
    */
-  deletePropertyByID: ReactPerf.measure(
-    'ReactDOMIDOperations',
-    'deletePropertyByID',
-    function(id, name, value) {
-      var node = ReactMount.getNode(id);
-      ("production" !== process.env.NODE_ENV ? invariant(
-        !INVALID_PROPERTY_ERRORS.hasOwnProperty(name),
-        'updatePropertyByID(...): %s',
-        INVALID_PROPERTY_ERRORS[name]
-      ) : invariant(!INVALID_PROPERTY_ERRORS.hasOwnProperty(name)));
-      DOMPropertyOperations.deleteValueForProperty(node, name, value);
-    }
-  ),
+  deletePropertyByID: function(id, name, value) {
+    var node = ReactMount.getNode(id);
+    ("production" !== process.env.NODE_ENV ? invariant(
+      !INVALID_PROPERTY_ERRORS.hasOwnProperty(name),
+      'updatePropertyByID(...): %s',
+      INVALID_PROPERTY_ERRORS[name]
+    ) : invariant(!INVALID_PROPERTY_ERRORS.hasOwnProperty(name)));
+    DOMPropertyOperations.deleteValueForProperty(node, name, value);
+  },
 
   /**
    * Updates a DOM node with new style values. If a value is specified as '',
@@ -7928,14 +8246,10 @@ var ReactDOMIDOperations = {
    * @param {object} styles Mapping from styles to values.
    * @internal
    */
-  updateStylesByID: ReactPerf.measure(
-    'ReactDOMIDOperations',
-    'updateStylesByID',
-    function(id, styles) {
-      var node = ReactMount.getNode(id);
-      CSSPropertyOperations.setValueForStyles(node, styles);
-    }
-  ),
+  updateStylesByID: function(id, styles) {
+    var node = ReactMount.getNode(id);
+    CSSPropertyOperations.setValueForStyles(node, styles);
+  },
 
   /**
    * Updates a DOM node's innerHTML.
@@ -7944,14 +8258,10 @@ var ReactDOMIDOperations = {
    * @param {string} html An HTML string.
    * @internal
    */
-  updateInnerHTMLByID: ReactPerf.measure(
-    'ReactDOMIDOperations',
-    'updateInnerHTMLByID',
-    function(id, html) {
-      var node = ReactMount.getNode(id);
-      setInnerHTML(node, html);
-    }
-  ),
+  updateInnerHTMLByID: function(id, html) {
+    var node = ReactMount.getNode(id);
+    setInnerHTML(node, html);
+  },
 
   /**
    * Updates a DOM node's text content set by `props.content`.
@@ -7960,14 +8270,10 @@ var ReactDOMIDOperations = {
    * @param {string} content Text content.
    * @internal
    */
-  updateTextContentByID: ReactPerf.measure(
-    'ReactDOMIDOperations',
-    'updateTextContentByID',
-    function(id, content) {
-      var node = ReactMount.getNode(id);
-      DOMChildrenOperations.updateTextContent(node, content);
-    }
-  ),
+  updateTextContentByID: function(id, content) {
+    var node = ReactMount.getNode(id);
+    DOMChildrenOperations.updateTextContent(node, content);
+  },
 
   /**
    * Replaces a DOM node that exists in the document with markup.
@@ -7977,14 +8283,10 @@ var ReactDOMIDOperations = {
    * @internal
    * @see {Danger.dangerouslyReplaceNodeWithMarkup}
    */
-  dangerouslyReplaceNodeWithMarkupByID: ReactPerf.measure(
-    'ReactDOMIDOperations',
-    'dangerouslyReplaceNodeWithMarkupByID',
-    function(id, markup) {
+  dangerouslyReplaceNodeWithMarkupByID: function(id, markup) {
       var node = ReactMount.getNode(id);
       DOMChildrenOperations.dangerouslyReplaceNodeWithMarkup(node, markup);
-    }
-  ),
+  },
 
   /**
    * Updates a component's children by processing a series of updates.
@@ -7993,17 +8295,23 @@ var ReactDOMIDOperations = {
    * @param {array<string>} markup List of markup strings.
    * @internal
    */
-  dangerouslyProcessChildrenUpdates: ReactPerf.measure(
-    'ReactDOMIDOperations',
-    'dangerouslyProcessChildrenUpdates',
-    function(updates, markup) {
-      for (var i = 0; i < updates.length; i++) {
-        updates[i].parentNode = ReactMount.getNode(updates[i].parentID);
-      }
-      DOMChildrenOperations.processUpdates(updates, markup);
+  dangerouslyProcessChildrenUpdates: function(updates, markup) {
+    for (var i = 0; i < updates.length; i++) {
+      updates[i].parentNode = ReactMount.getNode(updates[i].parentID);
     }
-  )
+    DOMChildrenOperations.processUpdates(updates, markup);
+  }
 };
+
+ReactPerf.measureMethods(ReactDOMIDOperations, 'ReactDOMIDOperations', {
+  updatePropertyByID: 'updatePropertyByID',
+  deletePropertyByID: 'deletePropertyByID',
+  updateStylesByID: 'updateStylesByID',
+  updateInnerHTMLByID: 'updateInnerHTMLByID',
+  updateTextContentByID: 'updateTextContentByID',
+  dangerouslyReplaceNodeWithMarkupByID: 'dangerouslyReplaceNodeWithMarkupByID',
+  dangerouslyProcessChildrenUpdates: 'dangerouslyProcessChildrenUpdates'
+});
 
 module.exports = ReactDOMIDOperations;
 
@@ -8020,17 +8328,15 @@ module.exports = ReactDOMIDOperations;
  * @providesModule ReactDOMImg
  */
 
-"use strict";
+'use strict';
 
 var EventConstants = require("./EventConstants");
 var LocalEventTrapMixin = require("./LocalEventTrapMixin");
 var ReactBrowserComponentMixin = require("./ReactBrowserComponentMixin");
-var ReactCompositeComponent = require("./ReactCompositeComponent");
+var ReactClass = require("./ReactClass");
 var ReactElement = require("./ReactElement");
-var ReactDOM = require("./ReactDOM");
 
-// Store a reference to the <img> `ReactDOMComponent`. TODO: use string
-var img = ReactElement.createFactory(ReactDOM.img.type);
+var img = ReactElement.createFactory('img');
 
 /**
  * Since onLoad doesn't bubble OR capture on the top level in IE8, we need to
@@ -8038,7 +8344,7 @@ var img = ReactElement.createFactory(ReactDOM.img.type);
  * to accomplish this, but the most reliable is to make <img> a composite
  * component and use `componentDidMount` to attach the event handlers.
  */
-var ReactDOMImg = ReactCompositeComponent.createClass({
+var ReactDOMImg = ReactClass.createClass({
   displayName: 'ReactDOMImg',
   tagName: 'IMG',
 
@@ -8056,7 +8362,7 @@ var ReactDOMImg = ReactCompositeComponent.createClass({
 
 module.exports = ReactDOMImg;
 
-},{"./EventConstants":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/EventConstants.js","./LocalEventTrapMixin":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/LocalEventTrapMixin.js","./ReactBrowserComponentMixin":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactBrowserComponentMixin.js","./ReactCompositeComponent":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactCompositeComponent.js","./ReactDOM":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactDOM.js","./ReactElement":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactElement.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactDOMInput.js":[function(require,module,exports){
+},{"./EventConstants":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/EventConstants.js","./LocalEventTrapMixin":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/LocalEventTrapMixin.js","./ReactBrowserComponentMixin":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactBrowserComponentMixin.js","./ReactClass":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactClass.js","./ReactElement":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactElement.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactDOMInput.js":[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2014, Facebook, Inc.
@@ -8069,23 +8375,21 @@ module.exports = ReactDOMImg;
  * @providesModule ReactDOMInput
  */
 
-"use strict";
+'use strict';
 
 var AutoFocusMixin = require("./AutoFocusMixin");
 var DOMPropertyOperations = require("./DOMPropertyOperations");
 var LinkedValueUtils = require("./LinkedValueUtils");
 var ReactBrowserComponentMixin = require("./ReactBrowserComponentMixin");
-var ReactCompositeComponent = require("./ReactCompositeComponent");
+var ReactClass = require("./ReactClass");
 var ReactElement = require("./ReactElement");
-var ReactDOM = require("./ReactDOM");
 var ReactMount = require("./ReactMount");
 var ReactUpdates = require("./ReactUpdates");
 
 var assign = require("./Object.assign");
 var invariant = require("./invariant");
 
-// Store a reference to the <input> `ReactDOMComponent`. TODO: use string
-var input = ReactElement.createFactory(ReactDOM.input.type);
+var input = ReactElement.createFactory('input');
 
 var instancesByReactID = {};
 
@@ -8112,8 +8416,9 @@ function forceUpdateIfMounted() {
  *
  * @see http://www.w3.org/TR/2012/WD-html5-20121025/the-input-element.html
  */
-var ReactDOMInput = ReactCompositeComponent.createClass({
+var ReactDOMInput = ReactClass.createClass({
   displayName: 'ReactDOMInput',
+  tagName: 'INPUT',
 
   mixins: [AutoFocusMixin, LinkedValueUtils.Mixin, ReactBrowserComponentMixin],
 
@@ -8234,7 +8539,7 @@ var ReactDOMInput = ReactCompositeComponent.createClass({
 module.exports = ReactDOMInput;
 
 }).call(this,require('_process'))
-},{"./AutoFocusMixin":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/AutoFocusMixin.js","./DOMPropertyOperations":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/DOMPropertyOperations.js","./LinkedValueUtils":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/LinkedValueUtils.js","./Object.assign":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/Object.assign.js","./ReactBrowserComponentMixin":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactBrowserComponentMixin.js","./ReactCompositeComponent":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactCompositeComponent.js","./ReactDOM":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactDOM.js","./ReactElement":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactElement.js","./ReactMount":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactMount.js","./ReactUpdates":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactUpdates.js","./invariant":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/invariant.js","_process":"/Users/sahat/Projects/trip-planner/node_modules/browserify/node_modules/process/browser.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactDOMOption.js":[function(require,module,exports){
+},{"./AutoFocusMixin":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/AutoFocusMixin.js","./DOMPropertyOperations":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/DOMPropertyOperations.js","./LinkedValueUtils":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/LinkedValueUtils.js","./Object.assign":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/Object.assign.js","./ReactBrowserComponentMixin":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactBrowserComponentMixin.js","./ReactClass":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactClass.js","./ReactElement":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactElement.js","./ReactMount":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactMount.js","./ReactUpdates":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactUpdates.js","./invariant":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/invariant.js","_process":"/Users/sahat/Projects/trip-planner/node_modules/browserify/node_modules/process/browser.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactDOMOption.js":[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2014, Facebook, Inc.
@@ -8247,23 +8552,22 @@ module.exports = ReactDOMInput;
  * @providesModule ReactDOMOption
  */
 
-"use strict";
+'use strict';
 
 var ReactBrowserComponentMixin = require("./ReactBrowserComponentMixin");
-var ReactCompositeComponent = require("./ReactCompositeComponent");
+var ReactClass = require("./ReactClass");
 var ReactElement = require("./ReactElement");
-var ReactDOM = require("./ReactDOM");
 
 var warning = require("./warning");
 
-// Store a reference to the <option> `ReactDOMComponent`. TODO: use string
-var option = ReactElement.createFactory(ReactDOM.option.type);
+var option = ReactElement.createFactory('option');
 
 /**
  * Implements an <option> native component that warns when `selected` is set.
  */
-var ReactDOMOption = ReactCompositeComponent.createClass({
+var ReactDOMOption = ReactClass.createClass({
   displayName: 'ReactDOMOption',
+  tagName: 'OPTION',
 
   mixins: [ReactBrowserComponentMixin],
 
@@ -8287,7 +8591,7 @@ var ReactDOMOption = ReactCompositeComponent.createClass({
 module.exports = ReactDOMOption;
 
 }).call(this,require('_process'))
-},{"./ReactBrowserComponentMixin":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactBrowserComponentMixin.js","./ReactCompositeComponent":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactCompositeComponent.js","./ReactDOM":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactDOM.js","./ReactElement":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactElement.js","./warning":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/warning.js","_process":"/Users/sahat/Projects/trip-planner/node_modules/browserify/node_modules/process/browser.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactDOMSelect.js":[function(require,module,exports){
+},{"./ReactBrowserComponentMixin":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactBrowserComponentMixin.js","./ReactClass":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactClass.js","./ReactElement":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactElement.js","./warning":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/warning.js","_process":"/Users/sahat/Projects/trip-planner/node_modules/browserify/node_modules/process/browser.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactDOMSelect.js":[function(require,module,exports){
 /**
  * Copyright 2013-2014, Facebook, Inc.
  * All rights reserved.
@@ -8299,26 +8603,27 @@ module.exports = ReactDOMOption;
  * @providesModule ReactDOMSelect
  */
 
-"use strict";
+'use strict';
 
 var AutoFocusMixin = require("./AutoFocusMixin");
 var LinkedValueUtils = require("./LinkedValueUtils");
 var ReactBrowserComponentMixin = require("./ReactBrowserComponentMixin");
-var ReactCompositeComponent = require("./ReactCompositeComponent");
+var ReactClass = require("./ReactClass");
 var ReactElement = require("./ReactElement");
-var ReactDOM = require("./ReactDOM");
 var ReactUpdates = require("./ReactUpdates");
 
 var assign = require("./Object.assign");
 
-// Store a reference to the <select> `ReactDOMComponent`. TODO: use string
-var select = ReactElement.createFactory(ReactDOM.select.type);
+var select = ReactElement.createFactory('select');
 
-function updateWithPendingValueIfMounted() {
+function updateOptionsIfPendingUpdateAndMounted() {
   /*jshint validthis:true */
-  if (this.isMounted()) {
-    this.setState({value: this._pendingValue});
-    this._pendingValue = 0;
+  if (this._pendingUpdate) {
+    this._pendingUpdate = false;
+    var value = LinkedValueUtils.getValue(this);
+    if (value != null && this.isMounted()) {
+      updateOptions(this, value);
+    }
   }
 }
 
@@ -8328,7 +8633,7 @@ function updateWithPendingValueIfMounted() {
  */
 function selectValueType(props, propName, componentName) {
   if (props[propName] == null) {
-    return;
+    return null;
   }
   if (props.multiple) {
     if (!Array.isArray(props[propName])) {
@@ -8348,40 +8653,43 @@ function selectValueType(props, propName, componentName) {
 }
 
 /**
- * If `value` is supplied, updates <option> elements on mount and update.
  * @param {ReactComponent} component Instance of ReactDOMSelect
- * @param {?*} propValue For uncontrolled components, null/undefined. For
- * controlled components, a string (or with `multiple`, a list of strings).
+ * @param {*} propValue A stringable (with `multiple`, a list of stringables).
  * @private
  */
 function updateOptions(component, propValue) {
-  var multiple = component.props.multiple;
-  var value = propValue != null ? propValue : component.state.value;
-  var options = component.getDOMNode().options;
   var selectedValue, i, l;
-  if (multiple) {
+  var options = component.getDOMNode().options;
+
+  if (component.props.multiple) {
     selectedValue = {};
-    for (i = 0, l = value.length; i < l; ++i) {
-      selectedValue['' + value[i]] = true;
+    for (i = 0, l = propValue.length; i < l; i++) {
+      selectedValue['' + propValue[i]] = true;
+    }
+    for (i = 0, l = options.length; i < l; i++) {
+      var selected = selectedValue.hasOwnProperty(options[i].value);
+      if (options[i].selected !== selected) {
+        options[i].selected = selected;
+      }
     }
   } else {
-    selectedValue = '' + value;
-  }
-  for (i = 0, l = options.length; i < l; i++) {
-    var selected = multiple ?
-      selectedValue.hasOwnProperty(options[i].value) :
-      options[i].value === selectedValue;
-
-    if (selected !== options[i].selected) {
-      options[i].selected = selected;
+    // Do not set `select.value` as exact behavior isn't consistent across all
+    // browsers for all cases.
+    selectedValue = '' + propValue;
+    for (i = 0, l = options.length; i < l; i++) {
+      if (options[i].value === selectedValue) {
+        options[i].selected = true;
+        return;
+      }
     }
+    options[0].selected = true;
   }
 }
 
 /**
  * Implements a <select> native component that allows optionally setting the
  * props `value` and `defaultValue`. If `multiple` is false, the prop must be a
- * string. If `multiple` is true, the prop must be an array of strings.
+ * stringable. If `multiple` is true, the prop must be an array of stringables.
  *
  * If `value` is not supplied (or null/undefined), user actions that change the
  * selected option will trigger updates to the rendered options.
@@ -8393,30 +8701,15 @@ function updateOptions(component, propValue) {
  * If `defaultValue` is provided, any options with the supplied values will be
  * selected.
  */
-var ReactDOMSelect = ReactCompositeComponent.createClass({
+var ReactDOMSelect = ReactClass.createClass({
   displayName: 'ReactDOMSelect',
+  tagName: 'SELECT',
 
   mixins: [AutoFocusMixin, LinkedValueUtils.Mixin, ReactBrowserComponentMixin],
 
   propTypes: {
     defaultValue: selectValueType,
     value: selectValueType
-  },
-
-  getInitialState: function() {
-    return {value: this.props.defaultValue || (this.props.multiple ? [] : '')};
-  },
-
-  componentWillMount: function() {
-    this._pendingValue = null;
-  },
-
-  componentWillReceiveProps: function(nextProps) {
-    if (!this.props.multiple && nextProps.multiple) {
-      this.setState({value: [this.state.value]});
-    } else if (this.props.multiple && !nextProps.multiple) {
-      this.setState({value: this.state.value[0]});
-    }
   },
 
   render: function() {
@@ -8429,16 +8722,32 @@ var ReactDOMSelect = ReactCompositeComponent.createClass({
     return select(props, this.props.children);
   },
 
+  componentWillMount: function() {
+    this._pendingUpdate = false;
+  },
+
   componentDidMount: function() {
-    updateOptions(this, LinkedValueUtils.getValue(this));
+    var value = LinkedValueUtils.getValue(this);
+    if (value != null) {
+      updateOptions(this, value);
+    } else if (this.props.defaultValue != null) {
+      updateOptions(this, this.props.defaultValue);
+    }
   },
 
   componentDidUpdate: function(prevProps) {
     var value = LinkedValueUtils.getValue(this);
-    var prevMultiple = !!prevProps.multiple;
-    var multiple = !!this.props.multiple;
-    if (value != null || prevMultiple !== multiple) {
+    if (value != null) {
+      this._pendingUpdate = false;
       updateOptions(this, value);
+    } else if (!prevProps.multiple !== !this.props.multiple) {
+      // For simplicity, reapply `defaultValue` if `multiple` is toggled.
+      if (this.props.defaultValue != null) {
+        updateOptions(this, this.props.defaultValue);
+      } else {
+        // Revert the select back to its default unselected state.
+        updateOptions(this, this.props.multiple ? [] : '');
+      }
     }
   },
 
@@ -8449,21 +8758,8 @@ var ReactDOMSelect = ReactCompositeComponent.createClass({
       returnValue = onChange.call(this, event);
     }
 
-    var selectedValue;
-    if (this.props.multiple) {
-      selectedValue = [];
-      var options = event.target.options;
-      for (var i = 0, l = options.length; i < l; i++) {
-        if (options[i].selected) {
-          selectedValue.push(options[i].value);
-        }
-      }
-    } else {
-      selectedValue = event.target.value;
-    }
-
-    this._pendingValue = selectedValue;
-    ReactUpdates.asap(updateWithPendingValueIfMounted, this);
+    this._pendingUpdate = true;
+    ReactUpdates.asap(updateOptionsIfPendingUpdateAndMounted, this);
     return returnValue;
   }
 
@@ -8471,7 +8767,7 @@ var ReactDOMSelect = ReactCompositeComponent.createClass({
 
 module.exports = ReactDOMSelect;
 
-},{"./AutoFocusMixin":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/AutoFocusMixin.js","./LinkedValueUtils":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/LinkedValueUtils.js","./Object.assign":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/Object.assign.js","./ReactBrowserComponentMixin":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactBrowserComponentMixin.js","./ReactCompositeComponent":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactCompositeComponent.js","./ReactDOM":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactDOM.js","./ReactElement":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactElement.js","./ReactUpdates":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactUpdates.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactDOMSelection.js":[function(require,module,exports){
+},{"./AutoFocusMixin":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/AutoFocusMixin.js","./LinkedValueUtils":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/LinkedValueUtils.js","./Object.assign":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/Object.assign.js","./ReactBrowserComponentMixin":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactBrowserComponentMixin.js","./ReactClass":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactClass.js","./ReactElement":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactElement.js","./ReactUpdates":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactUpdates.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactDOMSelection.js":[function(require,module,exports){
 /**
  * Copyright 2013-2014, Facebook, Inc.
  * All rights reserved.
@@ -8483,7 +8779,7 @@ module.exports = ReactDOMSelect;
  * @providesModule ReactDOMSelection
  */
 
-"use strict";
+'use strict';
 
 var ExecutionEnvironment = require("./ExecutionEnvironment");
 
@@ -8663,7 +8959,11 @@ function setModernOffsets(node, offsets) {
   }
 }
 
-var useIEOffsets = ExecutionEnvironment.canUseDOM && document.selection;
+var useIEOffsets = (
+  ExecutionEnvironment.canUseDOM &&
+  'selection' in document &&
+  !('getSelection' in window)
+);
 
 var ReactDOMSelection = {
   /**
@@ -8680,7 +8980,126 @@ var ReactDOMSelection = {
 
 module.exports = ReactDOMSelection;
 
-},{"./ExecutionEnvironment":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ExecutionEnvironment.js","./getNodeForCharacterOffset":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/getNodeForCharacterOffset.js","./getTextContentAccessor":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/getTextContentAccessor.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactDOMTextarea.js":[function(require,module,exports){
+},{"./ExecutionEnvironment":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ExecutionEnvironment.js","./getNodeForCharacterOffset":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/getNodeForCharacterOffset.js","./getTextContentAccessor":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/getTextContentAccessor.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactDOMTextComponent.js":[function(require,module,exports){
+/**
+ * Copyright 2013-2014, Facebook, Inc.
+ * All rights reserved.
+ *
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
+ *
+ * @providesModule ReactDOMTextComponent
+ * @typechecks static-only
+ */
+
+'use strict';
+
+var DOMPropertyOperations = require("./DOMPropertyOperations");
+var ReactComponentBrowserEnvironment =
+  require("./ReactComponentBrowserEnvironment");
+var ReactDOMComponent = require("./ReactDOMComponent");
+
+var assign = require("./Object.assign");
+var escapeTextForBrowser = require("./escapeTextForBrowser");
+var invariant = require("./invariant");
+
+/**
+ * Text nodes violate a couple assumptions that React makes about components:
+ *
+ *  - When mounting text into the DOM, adjacent text nodes are merged.
+ *  - Text nodes cannot be assigned a React root ID.
+ *
+ * This component is used to wrap strings in elements so that they can undergo
+ * the same reconciliation that is applied to elements.
+ *
+ * TODO: Investigate representing React components in the DOM with text nodes.
+ *
+ * @class ReactDOMTextComponent
+ * @extends ReactComponent
+ * @internal
+ */
+var ReactDOMTextComponent = function(props) {
+  // This constructor and its argument is currently used by mocks.
+};
+
+assign(ReactDOMTextComponent.prototype, {
+
+  /**
+   * @param {ReactText} text
+   * @internal
+   */
+  construct: function(text) {
+    // TODO: This is really a ReactText (ReactNode), not a ReactElement
+    this._currentElement = text;
+    this._stringText = '' + text;
+
+    // Properties
+    this._rootNodeID = null;
+    this._mountIndex = 0;
+  },
+
+  /**
+   * Creates the markup for this text node. This node is not intended to have
+   * any features besides containing text content.
+   *
+   * @param {string} rootID DOM ID of the root node.
+   * @param {ReactReconcileTransaction|ReactServerRenderingTransaction} transaction
+   * @return {string} Markup for this text node.
+   * @internal
+   */
+  mountComponent: function(rootID, transaction, context) {
+    this._rootNodeID = rootID;
+    var escapedText = escapeTextForBrowser(this._stringText);
+
+    if (transaction.renderToStaticMarkup) {
+      // Normally we'd wrap this in a `span` for the reasons stated above, but
+      // since this is a situation where React won't take over (static pages),
+      // we can simply return the text as it is.
+      return escapedText;
+    }
+
+    return (
+      '<span ' + DOMPropertyOperations.createMarkupForID(rootID) + '>' +
+        escapedText +
+      '</span>'
+    );
+  },
+
+  /**
+   * Updates this component by updating the text content.
+   *
+   * @param {ReactText} nextText The next text content
+   * @param {ReactReconcileTransaction} transaction
+   * @internal
+   */
+  receiveComponent: function(nextText, transaction) {
+    if (nextText !== this._currentElement) {
+      this._currentElement = nextText;
+      var nextStringText = '' + nextText;
+      if (nextStringText !== this._stringText) {
+        // TODO: Save this as pending props and use performUpdateIfNecessary
+        // and/or updateComponent to do the actual update for consistency with
+        // other component types?
+        this._stringText = nextStringText;
+        ReactDOMComponent.BackendIDOperations.updateTextContentByID(
+          this._rootNodeID,
+          nextStringText
+        );
+      }
+    }
+  },
+
+  unmountComponent: function() {
+    // TODO: Is this necessary?
+    ReactComponentBrowserEnvironment.unmountIDFromEnvironment(this._rootNodeID);
+  }
+
+});
+
+module.exports = ReactDOMTextComponent;
+
+},{"./DOMPropertyOperations":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/DOMPropertyOperations.js","./Object.assign":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/Object.assign.js","./ReactComponentBrowserEnvironment":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactComponentBrowserEnvironment.js","./ReactDOMComponent":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactDOMComponent.js","./escapeTextForBrowser":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/escapeTextForBrowser.js","./invariant":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/invariant.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactDOMTextarea.js":[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2014, Facebook, Inc.
@@ -8693,15 +9112,14 @@ module.exports = ReactDOMSelection;
  * @providesModule ReactDOMTextarea
  */
 
-"use strict";
+'use strict';
 
 var AutoFocusMixin = require("./AutoFocusMixin");
 var DOMPropertyOperations = require("./DOMPropertyOperations");
 var LinkedValueUtils = require("./LinkedValueUtils");
 var ReactBrowserComponentMixin = require("./ReactBrowserComponentMixin");
-var ReactCompositeComponent = require("./ReactCompositeComponent");
+var ReactClass = require("./ReactClass");
 var ReactElement = require("./ReactElement");
-var ReactDOM = require("./ReactDOM");
 var ReactUpdates = require("./ReactUpdates");
 
 var assign = require("./Object.assign");
@@ -8709,8 +9127,7 @@ var invariant = require("./invariant");
 
 var warning = require("./warning");
 
-// Store a reference to the <textarea> `ReactDOMComponent`. TODO: use string
-var textarea = ReactElement.createFactory(ReactDOM.textarea.type);
+var textarea = ReactElement.createFactory('textarea');
 
 function forceUpdateIfMounted() {
   /*jshint validthis:true */
@@ -8734,8 +9151,9 @@ function forceUpdateIfMounted() {
  * The rendered element will be initialized with an empty value, the prop
  * `defaultValue` if specified, or the children content (deprecated).
  */
-var ReactDOMTextarea = ReactCompositeComponent.createClass({
+var ReactDOMTextarea = ReactClass.createClass({
   displayName: 'ReactDOMTextarea',
+  tagName: 'TEXTAREA',
 
   mixins: [AutoFocusMixin, LinkedValueUtils.Mixin, ReactBrowserComponentMixin],
 
@@ -8821,7 +9239,7 @@ var ReactDOMTextarea = ReactCompositeComponent.createClass({
 module.exports = ReactDOMTextarea;
 
 }).call(this,require('_process'))
-},{"./AutoFocusMixin":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/AutoFocusMixin.js","./DOMPropertyOperations":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/DOMPropertyOperations.js","./LinkedValueUtils":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/LinkedValueUtils.js","./Object.assign":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/Object.assign.js","./ReactBrowserComponentMixin":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactBrowserComponentMixin.js","./ReactCompositeComponent":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactCompositeComponent.js","./ReactDOM":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactDOM.js","./ReactElement":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactElement.js","./ReactUpdates":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactUpdates.js","./invariant":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/invariant.js","./warning":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/warning.js","_process":"/Users/sahat/Projects/trip-planner/node_modules/browserify/node_modules/process/browser.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactDefaultBatchingStrategy.js":[function(require,module,exports){
+},{"./AutoFocusMixin":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/AutoFocusMixin.js","./DOMPropertyOperations":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/DOMPropertyOperations.js","./LinkedValueUtils":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/LinkedValueUtils.js","./Object.assign":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/Object.assign.js","./ReactBrowserComponentMixin":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactBrowserComponentMixin.js","./ReactClass":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactClass.js","./ReactElement":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactElement.js","./ReactUpdates":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactUpdates.js","./invariant":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/invariant.js","./warning":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/warning.js","_process":"/Users/sahat/Projects/trip-planner/node_modules/browserify/node_modules/process/browser.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactDefaultBatchingStrategy.js":[function(require,module,exports){
 /**
  * Copyright 2013-2014, Facebook, Inc.
  * All rights reserved.
@@ -8833,7 +9251,7 @@ module.exports = ReactDOMTextarea;
  * @providesModule ReactDefaultBatchingStrategy
  */
 
-"use strict";
+'use strict';
 
 var ReactUpdates = require("./ReactUpdates");
 var Transaction = require("./Transaction");
@@ -8878,16 +9296,16 @@ var ReactDefaultBatchingStrategy = {
    * Call the provided function in a context within which calls to `setState`
    * and friends are batched such that components aren't updated unnecessarily.
    */
-  batchedUpdates: function(callback, a, b) {
+  batchedUpdates: function(callback, a, b, c, d) {
     var alreadyBatchingUpdates = ReactDefaultBatchingStrategy.isBatchingUpdates;
 
     ReactDefaultBatchingStrategy.isBatchingUpdates = true;
 
     // The code is written this way to avoid extra allocations
     if (alreadyBatchingUpdates) {
-      callback(a, b);
+      callback(a, b, c, d);
     } else {
-      transaction.perform(callback, null, a, b);
+      transaction.perform(callback, null, a, b, c, d);
     }
   }
 };
@@ -8907,12 +9325,11 @@ module.exports = ReactDefaultBatchingStrategy;
  * @providesModule ReactDefaultInjection
  */
 
-"use strict";
+'use strict';
 
 var BeforeInputEventPlugin = require("./BeforeInputEventPlugin");
 var ChangeEventPlugin = require("./ChangeEventPlugin");
 var ClientReactRootIndex = require("./ClientReactRootIndex");
-var CompositionEventPlugin = require("./CompositionEventPlugin");
 var DefaultEventPluginOrder = require("./DefaultEventPluginOrder");
 var EnterLeaveEventPlugin = require("./EnterLeaveEventPlugin");
 var ExecutionEnvironment = require("./ExecutionEnvironment");
@@ -8926,14 +9343,17 @@ var ReactDOMComponent = require("./ReactDOMComponent");
 var ReactDOMButton = require("./ReactDOMButton");
 var ReactDOMForm = require("./ReactDOMForm");
 var ReactDOMImg = require("./ReactDOMImg");
+var ReactDOMIDOperations = require("./ReactDOMIDOperations");
 var ReactDOMInput = require("./ReactDOMInput");
 var ReactDOMOption = require("./ReactDOMOption");
 var ReactDOMSelect = require("./ReactDOMSelect");
 var ReactDOMTextarea = require("./ReactDOMTextarea");
+var ReactDOMTextComponent = require("./ReactDOMTextComponent");
 var ReactEventListener = require("./ReactEventListener");
 var ReactInjection = require("./ReactInjection");
 var ReactInstanceHandles = require("./ReactInstanceHandles");
 var ReactMount = require("./ReactMount");
+var ReactReconcileTransaction = require("./ReactReconcileTransaction");
 var SelectEventPlugin = require("./SelectEventPlugin");
 var ServerReactRootIndex = require("./ServerReactRootIndex");
 var SimpleEventPlugin = require("./SimpleEventPlugin");
@@ -8961,7 +9381,6 @@ function inject() {
     SimpleEventPlugin: SimpleEventPlugin,
     EnterLeaveEventPlugin: EnterLeaveEventPlugin,
     ChangeEventPlugin: ChangeEventPlugin,
-    CompositionEventPlugin: CompositionEventPlugin,
     MobileSafariClickEventPlugin: MobileSafariClickEventPlugin,
     SelectEventPlugin: SelectEventPlugin,
     BeforeInputEventPlugin: BeforeInputEventPlugin
@@ -8970,6 +9389,14 @@ function inject() {
   ReactInjection.NativeComponent.injectGenericComponentClass(
     ReactDOMComponent
   );
+
+  ReactInjection.NativeComponent.injectTextComponentClass(
+    ReactDOMTextComponent
+  );
+
+  // This needs to happen before createFullPageComponent() otherwise the mixin
+  // won't be included.
+  ReactInjection.Class.injectMixin(ReactBrowserComponentMixin);
 
   ReactInjection.NativeComponent.injectComponentClasses({
     'button': ReactDOMButton,
@@ -8985,17 +9412,13 @@ function inject() {
     'body': createFullPageComponent('body')
   });
 
-  // This needs to happen after createFullPageComponent() otherwise the mixin
-  // gets double injected.
-  ReactInjection.CompositeComponent.injectMixin(ReactBrowserComponentMixin);
-
   ReactInjection.DOMProperty.injectDOMPropertyConfig(HTMLDOMPropertyConfig);
   ReactInjection.DOMProperty.injectDOMPropertyConfig(SVGDOMPropertyConfig);
 
   ReactInjection.EmptyComponent.injectEmptyComponent('noscript');
 
   ReactInjection.Updates.injectReconcileTransaction(
-    ReactComponentBrowserEnvironment.ReactReconcileTransaction
+    ReactReconcileTransaction
   );
   ReactInjection.Updates.injectBatchingStrategy(
     ReactDefaultBatchingStrategy
@@ -9008,6 +9431,7 @@ function inject() {
   );
 
   ReactInjection.Component.injectEnvironment(ReactComponentBrowserEnvironment);
+  ReactInjection.DOMComponent.injectIDOperations(ReactDOMIDOperations);
 
   if ("production" !== process.env.NODE_ENV) {
     var url = (ExecutionEnvironment.canUseDOM && window.location.href) || '';
@@ -9023,7 +9447,7 @@ module.exports = {
 };
 
 }).call(this,require('_process'))
-},{"./BeforeInputEventPlugin":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/BeforeInputEventPlugin.js","./ChangeEventPlugin":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ChangeEventPlugin.js","./ClientReactRootIndex":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ClientReactRootIndex.js","./CompositionEventPlugin":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/CompositionEventPlugin.js","./DefaultEventPluginOrder":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/DefaultEventPluginOrder.js","./EnterLeaveEventPlugin":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/EnterLeaveEventPlugin.js","./ExecutionEnvironment":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ExecutionEnvironment.js","./HTMLDOMPropertyConfig":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/HTMLDOMPropertyConfig.js","./MobileSafariClickEventPlugin":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/MobileSafariClickEventPlugin.js","./ReactBrowserComponentMixin":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactBrowserComponentMixin.js","./ReactComponentBrowserEnvironment":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactComponentBrowserEnvironment.js","./ReactDOMButton":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactDOMButton.js","./ReactDOMComponent":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactDOMComponent.js","./ReactDOMForm":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactDOMForm.js","./ReactDOMImg":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactDOMImg.js","./ReactDOMInput":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactDOMInput.js","./ReactDOMOption":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactDOMOption.js","./ReactDOMSelect":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactDOMSelect.js","./ReactDOMTextarea":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactDOMTextarea.js","./ReactDefaultBatchingStrategy":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactDefaultBatchingStrategy.js","./ReactDefaultPerf":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactDefaultPerf.js","./ReactEventListener":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactEventListener.js","./ReactInjection":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactInjection.js","./ReactInstanceHandles":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactInstanceHandles.js","./ReactMount":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactMount.js","./SVGDOMPropertyConfig":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/SVGDOMPropertyConfig.js","./SelectEventPlugin":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/SelectEventPlugin.js","./ServerReactRootIndex":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ServerReactRootIndex.js","./SimpleEventPlugin":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/SimpleEventPlugin.js","./createFullPageComponent":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/createFullPageComponent.js","_process":"/Users/sahat/Projects/trip-planner/node_modules/browserify/node_modules/process/browser.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactDefaultPerf.js":[function(require,module,exports){
+},{"./BeforeInputEventPlugin":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/BeforeInputEventPlugin.js","./ChangeEventPlugin":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ChangeEventPlugin.js","./ClientReactRootIndex":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ClientReactRootIndex.js","./DefaultEventPluginOrder":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/DefaultEventPluginOrder.js","./EnterLeaveEventPlugin":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/EnterLeaveEventPlugin.js","./ExecutionEnvironment":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ExecutionEnvironment.js","./HTMLDOMPropertyConfig":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/HTMLDOMPropertyConfig.js","./MobileSafariClickEventPlugin":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/MobileSafariClickEventPlugin.js","./ReactBrowserComponentMixin":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactBrowserComponentMixin.js","./ReactComponentBrowserEnvironment":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactComponentBrowserEnvironment.js","./ReactDOMButton":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactDOMButton.js","./ReactDOMComponent":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactDOMComponent.js","./ReactDOMForm":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactDOMForm.js","./ReactDOMIDOperations":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactDOMIDOperations.js","./ReactDOMImg":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactDOMImg.js","./ReactDOMInput":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactDOMInput.js","./ReactDOMOption":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactDOMOption.js","./ReactDOMSelect":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactDOMSelect.js","./ReactDOMTextComponent":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactDOMTextComponent.js","./ReactDOMTextarea":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactDOMTextarea.js","./ReactDefaultBatchingStrategy":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactDefaultBatchingStrategy.js","./ReactDefaultPerf":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactDefaultPerf.js","./ReactEventListener":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactEventListener.js","./ReactInjection":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactInjection.js","./ReactInstanceHandles":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactInstanceHandles.js","./ReactMount":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactMount.js","./ReactReconcileTransaction":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactReconcileTransaction.js","./SVGDOMPropertyConfig":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/SVGDOMPropertyConfig.js","./SelectEventPlugin":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/SelectEventPlugin.js","./ServerReactRootIndex":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ServerReactRootIndex.js","./SimpleEventPlugin":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/SimpleEventPlugin.js","./createFullPageComponent":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/createFullPageComponent.js","_process":"/Users/sahat/Projects/trip-planner/node_modules/browserify/node_modules/process/browser.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactDefaultPerf.js":[function(require,module,exports){
 /**
  * Copyright 2013-2014, Facebook, Inc.
  * All rights reserved.
@@ -9036,7 +9460,7 @@ module.exports = {
  * @typechecks static-only
  */
 
-"use strict";
+'use strict';
 
 var DOMProperty = require("./DOMProperty");
 var ReactDefaultPerfAnalysis = require("./ReactDefaultPerfAnalysis");
@@ -9195,7 +9619,7 @@ var ReactDefaultPerf = {
         rv = func.apply(this, args);
         totalTime = performanceNow() - start;
 
-        if (fnName === 'mountImageIntoNode') {
+        if (fnName === '_mountImageIntoNode') {
           var mountID = ReactMount.getID(args[1]);
           ReactDefaultPerf._recordWrite(mountID, fnName, totalTime, args[0]);
         } else if (fnName === 'dangerouslyProcessChildrenUpdates') {
@@ -9232,9 +9656,9 @@ var ReactDefaultPerf = {
         }
         return rv;
       } else if (moduleName === 'ReactCompositeComponent' && (
-        fnName === 'mountComponent' ||
-        fnName === 'updateComponent' || // TODO: receiveComponent()?
-        fnName === '_renderValidatedComponent')) {
+        (// TODO: receiveComponent()?
+        (fnName === 'mountComponent' ||
+        fnName === 'updateComponent' || fnName === '_renderValidatedComponent')))) {
 
         var rootNodeID = fnName === 'mountComponent' ?
           args[0] :
@@ -9268,9 +9692,18 @@ var ReactDefaultPerf = {
           addValue(entry.inclusive, rootNodeID, totalTime);
         }
 
+        var displayName = null;
+        if (this._instance.constructor.displayName) {
+          displayName = this._instance.constructor.displayName;
+        } else if (this._currentElement.type) {
+          displayName = this._currentElement.type;
+        }
+
         entry.displayNames[rootNodeID] = {
-          current: this.constructor.displayName,
-          owner: this._owner ? this._owner.constructor.displayName : '<root>'
+          current: displayName,
+          owner: this._currentElement._owner ?
+            this._currentElement._owner._instance.constructor.displayName :
+            '<root>'
         };
 
         return rv;
@@ -9300,7 +9733,7 @@ var assign = require("./Object.assign");
 // Don't try to save users less than 1.2ms (a number I made up)
 var DONT_CARE_THRESHOLD = 1.2;
 var DOM_OPERATION_TYPES = {
-  'mountImageIntoNode': 'set innerHTML',
+  '_mountImageIntoNode': 'set innerHTML',
   INSERT_MARKUP: 'set innerHTML',
   MOVE_EXISTING: 'move',
   REMOVE_NODE: 'remove',
@@ -9502,11 +9935,12 @@ module.exports = ReactDefaultPerfAnalysis;
  * @providesModule ReactElement
  */
 
-"use strict";
+'use strict';
 
 var ReactContext = require("./ReactContext");
 var ReactCurrentOwner = require("./ReactCurrentOwner");
 
+var assign = require("./Object.assign");
 var warning = require("./warning");
 
 var RESERVED_PROPS = {
@@ -9537,8 +9971,9 @@ function defineWarningProperty(object, key) {
     set: function(value) {
       ("production" !== process.env.NODE_ENV ? warning(
         false,
-        'Don\'t set the ' + key + ' property of the component. ' +
-        'Mutate the existing props object instead.'
+        'Don\'t set the %s property of the React element. Instead, ' +
+        'specify the correct value when initially creating the element.',
+        key
       ) : null);
       this._store[key] = value;
     }
@@ -9599,7 +10034,21 @@ var ReactElement = function(type, key, ref, owner, context, props) {
     // an external backing store so that we can freeze the whole object.
     // This can be replaced with a WeakMap once they are implemented in
     // commonly used development environments.
-    this._store = { validated: false, props: props };
+    this._store = { props: props, originalProps: assign({}, props) };
+
+    // To make comparing ReactElements easier for testing purposes, we make
+    // the validation flag non-enumerable (where possible, which should
+    // include every environment we run tests in), so the test framework
+    // ignores it.
+    try {
+      Object.defineProperty(this._store, 'validated', {
+        configurable: false,
+        enumerable: false,
+        writable: true
+      });
+    } catch (x) {
+    }
+    this._store.validated = false;
 
     // We're not allowed to set props directly on the object so we early
     // return and rely on the prototype membrane to forward to the backing
@@ -9634,16 +10083,7 @@ ReactElement.createElement = function(type, config, children) {
 
   if (config != null) {
     ref = config.ref === undefined ? null : config.ref;
-    if ("production" !== process.env.NODE_ENV) {
-      ("production" !== process.env.NODE_ENV ? warning(
-        config.key !== null,
-        'createElement(...): Encountered component with a `key` of null. In ' +
-        'a future version, this will be treated as equivalent to the string ' +
-        '\'null\'; instead, provide an explicit key or use undefined.'
-      ) : null);
-    }
-    // TODO: Change this back to `config.key === undefined`
-    key = config.key == null ? null : '' + config.key;
+    key = config.key === undefined ? null : '' + config.key;
     // Remaining properties are added to a new props object
     for (propName in config) {
       if (config.hasOwnProperty(propName) &&
@@ -9692,6 +10132,7 @@ ReactElement.createFactory = function(type) {
   // easily accessed on elements. E.g. <Foo />.type === Foo.type.
   // This should not be named `constructor` since this may not be the function
   // that created the element, and it may not even be a constructor.
+  // Legacy hook TODO: Warn if this is accessed
   factory.type = type;
   return factory;
 };
@@ -9735,7 +10176,7 @@ ReactElement.isValidElement = function(object) {
 module.exports = ReactElement;
 
 }).call(this,require('_process'))
-},{"./ReactContext":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactContext.js","./ReactCurrentOwner":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactCurrentOwner.js","./warning":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/warning.js","_process":"/Users/sahat/Projects/trip-planner/node_modules/browserify/node_modules/process/browser.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactElementValidator.js":[function(require,module,exports){
+},{"./Object.assign":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/Object.assign.js","./ReactContext":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactContext.js","./ReactCurrentOwner":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactCurrentOwner.js","./warning":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/warning.js","_process":"/Users/sahat/Projects/trip-planner/node_modules/browserify/node_modules/process/browser.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactElementValidator.js":[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2014, Facebook, Inc.
@@ -9755,14 +10196,28 @@ module.exports = ReactElement;
  * that support it.
  */
 
-"use strict";
+'use strict';
 
 var ReactElement = require("./ReactElement");
 var ReactPropTypeLocations = require("./ReactPropTypeLocations");
+var ReactPropTypeLocationNames = require("./ReactPropTypeLocationNames");
 var ReactCurrentOwner = require("./ReactCurrentOwner");
+var ReactNativeComponent = require("./ReactNativeComponent");
 
+var getIteratorFn = require("./getIteratorFn");
 var monitorCodeUse = require("./monitorCodeUse");
+var invariant = require("./invariant");
 var warning = require("./warning");
+
+function getDeclarationErrorAddendum() {
+  if (ReactCurrentOwner.current) {
+    var name = ReactCurrentOwner.current.getName();
+    if (name) {
+      return ' Check the render method of `' + name + '`.';
+    }
+  }
+  return '';
+}
 
 /**
  * Warn if there's no key explicitly set on dynamic arrays of children or
@@ -9780,6 +10235,24 @@ var loggedTypeFailures = {};
 var NUMERIC_PROPERTY_REGEX = /^\d+$/;
 
 /**
+ * Gets the instance's name for use in warnings.
+ *
+ * @internal
+ * @return {?string} Display name or undefined
+ */
+function getName(instance) {
+  var publicInstance = instance && instance.getPublicInstance();
+  if (!publicInstance) {
+    return undefined;
+  }
+  var constructor = publicInstance.constructor;
+  if (!constructor) {
+    return undefined;
+  }
+  return constructor.displayName || constructor.name || undefined;
+}
+
+/**
  * Gets the current owner's displayName for use in warnings.
  *
  * @internal
@@ -9787,29 +10260,31 @@ var NUMERIC_PROPERTY_REGEX = /^\d+$/;
  */
 function getCurrentOwnerDisplayName() {
   var current = ReactCurrentOwner.current;
-  return current && current.constructor.displayName || undefined;
+  return (
+    current && getName(current) || undefined
+  );
 }
 
 /**
- * Warn if the component doesn't have an explicit key assigned to it.
- * This component is in an array. The array could grow and shrink or be
+ * Warn if the element doesn't have an explicit key assigned to it.
+ * This element is in an array. The array could grow and shrink or be
  * reordered. All children that haven't already been validated are required to
  * have a "key" property assigned to it.
  *
  * @internal
- * @param {ReactComponent} component Component that requires a key.
- * @param {*} parentType component's parent's type.
+ * @param {ReactElement} element Element that requires a key.
+ * @param {*} parentType element's parent's type.
  */
-function validateExplicitKey(component, parentType) {
-  if (component._store.validated || component.key != null) {
+function validateExplicitKey(element, parentType) {
+  if (element._store.validated || element.key != null) {
     return;
   }
-  component._store.validated = true;
+  element._store.validated = true;
 
   warnAndMonitorForKeyUse(
     'react_key_warning',
-    'Each child in an array should have a unique "key" prop.',
-    component,
+    'Each child in an array or iterator should have a unique "key" prop.',
+    element,
     parentType
   );
 }
@@ -9820,17 +10295,17 @@ function validateExplicitKey(component, parentType) {
  *
  * @internal
  * @param {string} name Property name of the key.
- * @param {ReactComponent} component Component that requires a key.
- * @param {*} parentType component's parent's type.
+ * @param {ReactElement} element Component that requires a key.
+ * @param {*} parentType element's parent's type.
  */
-function validatePropertyKey(name, component, parentType) {
+function validatePropertyKey(name, element, parentType) {
   if (!NUMERIC_PROPERTY_REGEX.test(name)) {
     return;
   }
   warnAndMonitorForKeyUse(
     'react_numeric_key_warning',
     'Child objects should have non-numeric keys so ordering is preserved.',
-    component,
+    element,
     parentType
   );
 }
@@ -9841,12 +10316,12 @@ function validatePropertyKey(name, component, parentType) {
  * @internal
  * @param {string} warningID The id used when logging.
  * @param {string} message The base warning that gets output.
- * @param {ReactComponent} component Component that requires a key.
- * @param {*} parentType component's parent's type.
+ * @param {ReactElement} element Component that requires a key.
+ * @param {*} parentType element's parent's type.
  */
-function warnAndMonitorForKeyUse(warningID, message, component, parentType) {
+function warnAndMonitorForKeyUse(warningID, message, element, parentType) {
   var ownerName = getCurrentOwnerDisplayName();
-  var parentName = parentType.displayName;
+  var parentName = parentType.displayName || parentType.name;
 
   var useName = ownerName || parentName;
   var memoizer = ownerHasKeyUseWarning[warningID];
@@ -9857,15 +10332,17 @@ function warnAndMonitorForKeyUse(warningID, message, component, parentType) {
 
   message += ownerName ?
     (" Check the render method of " + ownerName + ".") :
-    (" Check the renderComponent call using <" + parentName + ">.");
+    (" Check the React.render call using <" + parentName + ">.");
 
   // Usually the current owner is the offender, but if it accepts children as a
   // property, it may be the creator of the child that's responsible for
   // assigning it a key.
   var childOwnerName = null;
-  if (component._owner && component._owner !== ReactCurrentOwner.current) {
+  if (element &&
+      element._owner &&
+      element._owner !== ReactCurrentOwner.current) {
     // Name of the component that originally created this child.
-    childOwnerName = component._owner.constructor.displayName;
+    childOwnerName = getName(element._owner);
 
     message += (" It was passed a child from " + childOwnerName + ".");
   }
@@ -9894,30 +10371,43 @@ function monitorUseOfObjectMap() {
 }
 
 /**
- * Ensure that every component either is passed in a static location, in an
+ * Ensure that every element either is passed in a static location, in an
  * array with an explicit keys property defined, or in an object literal
  * with valid key property.
  *
  * @internal
- * @param {*} component Statically passed child of any type.
- * @param {*} parentType component's parent's type.
- * @return {boolean}
+ * @param {ReactNode} node Statically passed child of any type.
+ * @param {*} parentType node's parent's type.
  */
-function validateChildKeys(component, parentType) {
-  if (Array.isArray(component)) {
-    for (var i = 0; i < component.length; i++) {
-      var child = component[i];
+function validateChildKeys(node, parentType) {
+  if (Array.isArray(node)) {
+    for (var i = 0; i < node.length; i++) {
+      var child = node[i];
       if (ReactElement.isValidElement(child)) {
         validateExplicitKey(child, parentType);
       }
     }
-  } else if (ReactElement.isValidElement(component)) {
-    // This component was passed in a valid location.
-    component._store.validated = true;
-  } else if (component && typeof component === 'object') {
-    monitorUseOfObjectMap();
-    for (var name in component) {
-      validatePropertyKey(name, component[name], parentType);
+  } else if (ReactElement.isValidElement(node)) {
+    // This element was passed in a valid location.
+    node._store.validated = true;
+  } else if (node) {
+    var iteratorFn = getIteratorFn(node);
+    // Entry iterators provide implicit keys.
+    if (iteratorFn && iteratorFn !== node.entries) {
+      var iterator = iteratorFn.call(node);
+      var step;
+      while (!(step = iterator.next()).done) {
+        if (ReactElement.isValidElement(step.value)) {
+          validateExplicitKey(step.value, parentType);
+        }
+      }
+    } else if (typeof node === 'object') {
+      monitorUseOfObjectMap();
+      for (var key in node) {
+        if (node.hasOwnProperty(key)) {
+          validatePropertyKey(key, node[key], parentType);
+        }
+      }
     }
   }
 }
@@ -9939,6 +10429,16 @@ function checkPropTypes(componentName, propTypes, props, location) {
       // fail the render phase where it didn't fail before. So we log it.
       // After these have been cleaned up, we'll let them throw.
       try {
+        // This is intentionally an invariant that gets caught. It's the same
+        // behavior as without this statement except with a better message.
+        ("production" !== process.env.NODE_ENV ? invariant(
+          typeof propTypes[propName] === 'function',
+          '%s: %s type `%s` is invalid; it must be a function, usually from ' +
+          'React.PropTypes.',
+          componentName || 'React class',
+          ReactPropTypeLocationNames[location],
+          propName
+        ) : invariant(typeof propTypes[propName] === 'function'));
         error = propTypes[propName](props, propName, componentName, location);
       } catch (ex) {
         error = ex;
@@ -9947,17 +10447,88 @@ function checkPropTypes(componentName, propTypes, props, location) {
         // Only monitor this failure once because there tends to be a lot of the
         // same error.
         loggedTypeFailures[error.message] = true;
-        // This will soon use the warning module
-        monitorCodeUse(
-          'react_failed_descriptor_type_check',
-          { message: error.message }
-        );
+
+        var addendum = getDeclarationErrorAddendum(this);
+        ("production" !== process.env.NODE_ENV ? warning(false, error.message + addendum) : null);
+      }
+    }
+  }
+}
+
+var warnedPropsMutations = {};
+
+/**
+ * Warn about mutating props when setting `propName` on `element`.
+ *
+ * @param {string} propName The string key within props that was set
+ * @param {ReactElement} element
+ */
+function warnForPropsMutation(propName, element) {
+  var type = element.type;
+  var elementName = typeof type === 'string' ? type : type.displayName;
+  var ownerName = element._owner ?
+    element._owner.getPublicInstance().constructor.displayName : null;
+
+  var warningKey = propName + '|' + elementName + '|' + ownerName;
+  if (warnedPropsMutations.hasOwnProperty(warningKey)) {
+    return;
+  }
+  warnedPropsMutations[warningKey] = true;
+
+  var elementInfo = '';
+  if (elementName) {
+    elementInfo = ' <' + elementName + ' />';
+  }
+  var ownerInfo = '';
+  if (ownerName) {
+    ownerInfo = ' The element was created by ' + ownerName + '.';
+  }
+
+  ("production" !== process.env.NODE_ENV ? warning(
+    false,
+    'Don\'t set .props.%s of the React component%s. ' +
+    'Instead, specify the correct value when ' +
+    'initially creating the element.%s',
+    propName,
+    elementInfo,
+    ownerInfo
+  ) : null);
+}
+
+/**
+ * Given an element, check if its props have been mutated since element
+ * creation (or the last call to this function). In particular, check if any
+ * new props have been added, which we can't directly catch by defining warning
+ * properties on the props object.
+ *
+ * @param {ReactElement} element
+ */
+function checkAndWarnForMutatedProps(element) {
+  if (!element._store) {
+    // Element was created using `new ReactElement` directly or with
+    // `ReactElement.createElement`; skip mutation checking
+    return;
+  }
+
+  var originalProps = element._store.originalProps;
+  var props = element.props;
+
+  for (var propName in props) {
+    if (props.hasOwnProperty(propName)) {
+      if (!originalProps.hasOwnProperty(propName) ||
+          originalProps[propName] !== props[propName]) {
+        warnForPropsMutation(propName, element);
+
+        // Copy over the new value so that the two props objects match again
+        originalProps[propName] = props[propName];
       }
     }
   }
 }
 
 var ReactElementValidator = {
+
+  checkAndWarnForMutatedProps: checkAndWarnForMutatedProps,
 
   createElement: function(type, props, children) {
     // We warn in this case but don't throw. We expect the element creation to
@@ -9982,24 +10553,33 @@ var ReactElementValidator = {
     }
 
     if (type) {
-      var name = type.displayName;
-      if (type.propTypes) {
-        checkPropTypes(
-          name,
-          type.propTypes,
-          element.props,
-          ReactPropTypeLocations.prop
-        );
+      // Extract the component class from the element. Converts string types
+      // to a composite class which may have propTypes.
+      // TODO: Validating a string's propTypes is not decoupled from the
+      // rendering target which is problematic.
+      var componentClass = ReactNativeComponent.getComponentClassForElement(
+        element
+      );
+      var name = componentClass.displayName || componentClass.name;
+      if ("production" !== process.env.NODE_ENV) {
+        if (componentClass.propTypes) {
+          checkPropTypes(
+            name,
+            componentClass.propTypes,
+            element.props,
+            ReactPropTypeLocations.prop
+          );
+        }
       }
-      if (type.contextTypes) {
-        checkPropTypes(
-          name,
-          type.contextTypes,
-          element._context,
-          ReactPropTypeLocations.context
-        );
+      if (typeof componentClass.getDefaultProps === 'function') {
+        ("production" !== process.env.NODE_ENV ? warning(
+          componentClass.getDefaultProps.isReactClassApproved,
+          'getDefaultProps is only used on classic React.createClass ' +
+          'definitions. Use a static property named `defaultProps` instead.'
+        ) : null);
       }
     }
+
     return element;
   },
 
@@ -10008,6 +10588,7 @@ var ReactElementValidator = {
       null,
       type
     );
+    // Legacy hook TODO: Warn if this is accessed
     validatedFactory.type = type;
     return validatedFactory;
   }
@@ -10017,7 +10598,7 @@ var ReactElementValidator = {
 module.exports = ReactElementValidator;
 
 }).call(this,require('_process'))
-},{"./ReactCurrentOwner":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactCurrentOwner.js","./ReactElement":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactElement.js","./ReactPropTypeLocations":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactPropTypeLocations.js","./monitorCodeUse":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/monitorCodeUse.js","./warning":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/warning.js","_process":"/Users/sahat/Projects/trip-planner/node_modules/browserify/node_modules/process/browser.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactEmptyComponent.js":[function(require,module,exports){
+},{"./ReactCurrentOwner":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactCurrentOwner.js","./ReactElement":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactElement.js","./ReactNativeComponent":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactNativeComponent.js","./ReactPropTypeLocationNames":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactPropTypeLocationNames.js","./ReactPropTypeLocations":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactPropTypeLocations.js","./getIteratorFn":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/getIteratorFn.js","./invariant":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/invariant.js","./monitorCodeUse":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/monitorCodeUse.js","./warning":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/warning.js","_process":"/Users/sahat/Projects/trip-planner/node_modules/browserify/node_modules/process/browser.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactEmptyComponent.js":[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2014, Facebook, Inc.
@@ -10030,9 +10611,10 @@ module.exports = ReactElementValidator;
  * @providesModule ReactEmptyComponent
  */
 
-"use strict";
+'use strict';
 
 var ReactElement = require("./ReactElement");
+var ReactInstanceMap = require("./ReactInstanceMap");
 
 var invariant = require("./invariant");
 
@@ -10047,17 +10629,36 @@ var ReactEmptyComponentInjection = {
   }
 };
 
-/**
- * @return {ReactComponent} component The injected empty component.
- */
-function getEmptyComponent() {
+var ReactEmptyComponentType = function() {};
+ReactEmptyComponentType.prototype.componentDidMount = function() {
+  var internalInstance = ReactInstanceMap.get(this);
+  // TODO: Make sure we run these methods in the correct order, we shouldn't
+  // need this check. We're going to assume if we're here it means we ran
+  // componentWillUnmount already so there is no internal instance (it gets
+  // removed as part of the unmounting process).
+  if (!internalInstance) {
+    return;
+  }
+  registerNullComponentID(internalInstance._rootNodeID);
+};
+ReactEmptyComponentType.prototype.componentWillUnmount = function() {
+  var internalInstance = ReactInstanceMap.get(this);
+  // TODO: Get rid of this check. See TODO in componentDidMount.
+  if (!internalInstance) {
+    return;
+  }
+  deregisterNullComponentID(internalInstance._rootNodeID);
+};
+ReactEmptyComponentType.prototype.render = function() {
   ("production" !== process.env.NODE_ENV ? invariant(
     component,
     'Trying to return null from a render, but no null placeholder component ' +
     'was injected.'
   ) : invariant(component));
   return component();
-}
+};
+
+var emptyElement = ReactElement.createElement(ReactEmptyComponentType);
 
 /**
  * Mark the component as having rendered to null.
@@ -10080,21 +10681,19 @@ function deregisterNullComponentID(id) {
  * @return {boolean} True if the component is rendered to null.
  */
 function isNullComponentID(id) {
-  return nullComponentIdsRegistry[id];
+  return !!nullComponentIdsRegistry[id];
 }
 
 var ReactEmptyComponent = {
-  deregisterNullComponentID: deregisterNullComponentID,
-  getEmptyComponent: getEmptyComponent,
+  emptyElement: emptyElement,
   injection: ReactEmptyComponentInjection,
-  isNullComponentID: isNullComponentID,
-  registerNullComponentID: registerNullComponentID
+  isNullComponentID: isNullComponentID
 };
 
 module.exports = ReactEmptyComponent;
 
 }).call(this,require('_process'))
-},{"./ReactElement":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactElement.js","./invariant":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/invariant.js","_process":"/Users/sahat/Projects/trip-planner/node_modules/browserify/node_modules/process/browser.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactErrorUtils.js":[function(require,module,exports){
+},{"./ReactElement":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactElement.js","./ReactInstanceMap":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactInstanceMap.js","./invariant":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/invariant.js","_process":"/Users/sahat/Projects/trip-planner/node_modules/browserify/node_modules/process/browser.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactErrorUtils.js":[function(require,module,exports){
 /**
  * Copyright 2013-2014, Facebook, Inc.
  * All rights reserved.
@@ -10138,7 +10737,7 @@ module.exports = ReactErrorUtils;
  * @providesModule ReactEventEmitterMixin
  */
 
-"use strict";
+'use strict';
 
 var EventPluginHub = require("./EventPluginHub");
 
@@ -10189,7 +10788,7 @@ module.exports = ReactEventEmitterMixin;
  * @typechecks static-only
  */
 
-"use strict";
+'use strict';
 
 var EventListener = require("./EventListener");
 var ExecutionEnvironment = require("./ExecutionEnvironment");
@@ -10302,7 +10901,7 @@ var ReactEventListener = {
   trapBubbledEvent: function(topLevelType, handlerBaseName, handle) {
     var element = handle;
     if (!element) {
-      return;
+      return null;
     }
     return EventListener.listen(
       element,
@@ -10324,7 +10923,7 @@ var ReactEventListener = {
   trapCapturedEvent: function(topLevelType, handlerBaseName, handle) {
     var element = handle;
     if (!element) {
-      return;
+      return null;
     }
     return EventListener.capture(
       element,
@@ -10336,7 +10935,6 @@ var ReactEventListener = {
   monitorScrollValue: function(refresh) {
     var callback = scrollValueMonitor.bind(null, refresh);
     EventListener.listen(window, 'scroll', callback);
-    EventListener.listen(window, 'resize', callback);
   },
 
   dispatchEvent: function(topLevelType, nativeEvent) {
@@ -10372,22 +10970,24 @@ module.exports = ReactEventListener;
  * @providesModule ReactInjection
  */
 
-"use strict";
+'use strict';
 
 var DOMProperty = require("./DOMProperty");
 var EventPluginHub = require("./EventPluginHub");
-var ReactComponent = require("./ReactComponent");
-var ReactCompositeComponent = require("./ReactCompositeComponent");
+var ReactComponentEnvironment = require("./ReactComponentEnvironment");
+var ReactClass = require("./ReactClass");
 var ReactEmptyComponent = require("./ReactEmptyComponent");
 var ReactBrowserEventEmitter = require("./ReactBrowserEventEmitter");
 var ReactNativeComponent = require("./ReactNativeComponent");
+var ReactDOMComponent = require("./ReactDOMComponent");
 var ReactPerf = require("./ReactPerf");
 var ReactRootIndex = require("./ReactRootIndex");
 var ReactUpdates = require("./ReactUpdates");
 
 var ReactInjection = {
-  Component: ReactComponent.injection,
-  CompositeComponent: ReactCompositeComponent.injection,
+  Component: ReactComponentEnvironment.injection,
+  Class: ReactClass.injection,
+  DOMComponent: ReactDOMComponent.injection,
   DOMProperty: DOMProperty.injection,
   EmptyComponent: ReactEmptyComponent.injection,
   EventPluginHub: EventPluginHub.injection,
@@ -10400,7 +11000,7 @@ var ReactInjection = {
 
 module.exports = ReactInjection;
 
-},{"./DOMProperty":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/DOMProperty.js","./EventPluginHub":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/EventPluginHub.js","./ReactBrowserEventEmitter":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactBrowserEventEmitter.js","./ReactComponent":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactComponent.js","./ReactCompositeComponent":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactCompositeComponent.js","./ReactEmptyComponent":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactEmptyComponent.js","./ReactNativeComponent":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactNativeComponent.js","./ReactPerf":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactPerf.js","./ReactRootIndex":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactRootIndex.js","./ReactUpdates":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactUpdates.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactInputSelection.js":[function(require,module,exports){
+},{"./DOMProperty":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/DOMProperty.js","./EventPluginHub":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/EventPluginHub.js","./ReactBrowserEventEmitter":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactBrowserEventEmitter.js","./ReactClass":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactClass.js","./ReactComponentEnvironment":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactComponentEnvironment.js","./ReactDOMComponent":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactDOMComponent.js","./ReactEmptyComponent":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactEmptyComponent.js","./ReactNativeComponent":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactNativeComponent.js","./ReactPerf":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactPerf.js","./ReactRootIndex":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactRootIndex.js","./ReactUpdates":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactUpdates.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactInputSelection.js":[function(require,module,exports){
 /**
  * Copyright 2013-2014, Facebook, Inc.
  * All rights reserved.
@@ -10412,7 +11012,7 @@ module.exports = ReactInjection;
  * @providesModule ReactInputSelection
  */
 
-"use strict";
+'use strict';
 
 var ReactDOMSelection = require("./ReactDOMSelection");
 
@@ -10434,9 +11034,8 @@ var ReactInputSelection = {
 
   hasSelectionCapabilities: function(elem) {
     return elem && (
-      (elem.nodeName === 'INPUT' && elem.type === 'text') ||
-      elem.nodeName === 'TEXTAREA' ||
-      elem.contentEditable === 'true'
+      ((elem.nodeName === 'INPUT' && elem.type === 'text') ||
+      elem.nodeName === 'TEXTAREA' || elem.contentEditable === 'true')
     );
   },
 
@@ -10550,7 +11149,7 @@ module.exports = ReactInputSelection;
  * @typechecks static-only
  */
 
-"use strict";
+'use strict';
 
 var ReactRootIndex = require("./ReactRootIndex");
 
@@ -10655,7 +11254,8 @@ function getNextDescendantID(ancestorID, destinationID) {
   // Skip over the ancestor and the immediate separator. Traverse until we hit
   // another separator or we reach the end of `destinationID`.
   var start = ancestorID.length + SEPARATOR_LENGTH;
-  for (var i = start; i < destinationID.length; i++) {
+  var i;
+  for (i = start; i < destinationID.length; i++) {
     if (isBoundary(destinationID, i)) {
       break;
     }
@@ -10871,254 +11471,93 @@ var ReactInstanceHandles = {
 module.exports = ReactInstanceHandles;
 
 }).call(this,require('_process'))
-},{"./ReactRootIndex":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactRootIndex.js","./invariant":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/invariant.js","_process":"/Users/sahat/Projects/trip-planner/node_modules/browserify/node_modules/process/browser.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactLegacyElement.js":[function(require,module,exports){
-(function (process){
+},{"./ReactRootIndex":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactRootIndex.js","./invariant":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/invariant.js","_process":"/Users/sahat/Projects/trip-planner/node_modules/browserify/node_modules/process/browser.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactInstanceMap.js":[function(require,module,exports){
 /**
- * Copyright 2014, Facebook, Inc.
+ * Copyright 2013-2014, Facebook, Inc.
  * All rights reserved.
  *
  * This source code is licensed under the BSD-style license found in the
  * LICENSE file in the root directory of this source tree. An additional grant
  * of patent rights can be found in the PATENTS file in the same directory.
  *
- * @providesModule ReactLegacyElement
+ * @providesModule ReactInstanceMap
+ */
+
+'use strict';
+
+/**
+ * `ReactInstanceMap` maintains a mapping from a public facing stateful
+ * instance (key) and the internal representation (value). This allows public
+ * methods to accept the user facing instance as an argument and map them back
+ * to internal methods.
+ */
+
+// TODO: Replace this with ES6: var ReactInstanceMap = new Map();
+var ReactInstanceMap = {
+
+  /**
+   * This API should be called `delete` but we'd have to make sure to always
+   * transform these to strings for IE support. When this transform is fully
+   * supported we can rename it.
+   */
+  remove: function(key) {
+    key._reactInternalInstance = undefined;
+  },
+
+  get: function(key) {
+    return key._reactInternalInstance;
+  },
+
+  has: function(key) {
+    return key._reactInternalInstance !== undefined;
+  },
+
+  set: function(key, value) {
+    key._reactInternalInstance = value;
+  }
+
+};
+
+module.exports = ReactInstanceMap;
+
+},{}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactLifeCycle.js":[function(require,module,exports){
+/**
+ * Copyright 2015, Facebook, Inc.
+ * All rights reserved.
+ *
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
+ *
+ * @providesModule ReactLifeCycle
  */
 
 "use strict";
 
-var ReactCurrentOwner = require("./ReactCurrentOwner");
-
-var invariant = require("./invariant");
-var monitorCodeUse = require("./monitorCodeUse");
-var warning = require("./warning");
-
-var legacyFactoryLogs = {};
-function warnForLegacyFactoryCall() {
-  if (!ReactLegacyElementFactory._isLegacyCallWarningEnabled) {
-    return;
-  }
-  var owner = ReactCurrentOwner.current;
-  var name = owner && owner.constructor ? owner.constructor.displayName : '';
-  if (!name) {
-    name = 'Something';
-  }
-  if (legacyFactoryLogs.hasOwnProperty(name)) {
-    return;
-  }
-  legacyFactoryLogs[name] = true;
-  ("production" !== process.env.NODE_ENV ? warning(
-    false,
-    name + ' is calling a React component directly. ' +
-    'Use a factory or JSX instead. See: http://fb.me/react-legacyfactory'
-  ) : null);
-  monitorCodeUse('react_legacy_factory_call', { version: 3, name: name });
-}
-
-function warnForPlainFunctionType(type) {
-  var isReactClass =
-    type.prototype &&
-    typeof type.prototype.mountComponent === 'function' &&
-    typeof type.prototype.receiveComponent === 'function';
-  if (isReactClass) {
-    ("production" !== process.env.NODE_ENV ? warning(
-      false,
-      'Did not expect to get a React class here. Use `Component` instead ' +
-      'of `Component.type` or `this.constructor`.'
-    ) : null);
-  } else {
-    if (!type._reactWarnedForThisType) {
-      try {
-        type._reactWarnedForThisType = true;
-      } catch (x) {
-        // just incase this is a frozen object or some special object
-      }
-      monitorCodeUse(
-        'react_non_component_in_jsx',
-        { version: 3, name: type.name }
-      );
-    }
-    ("production" !== process.env.NODE_ENV ? warning(
-      false,
-      'This JSX uses a plain function. Only React components are ' +
-      'valid in React\'s JSX transform.'
-    ) : null);
-  }
-}
-
-function warnForNonLegacyFactory(type) {
-  ("production" !== process.env.NODE_ENV ? warning(
-    false,
-    'Do not pass React.DOM.' + type.type + ' to JSX or createFactory. ' +
-    'Use the string "' + type.type + '" instead.'
-  ) : null);
-}
-
 /**
- * Transfer static properties from the source to the target. Functions are
- * rebound to have this reflect the original source.
+ * This module manages the bookkeeping when a component is in the process
+ * of being mounted or being unmounted. This is used as a way to enforce
+ * invariants (or warnings) when it is not recommended to call
+ * setState/forceUpdate.
+ *
+ * currentlyMountingInstance: During the construction phase, it is not possible
+ * to trigger an update since the instance is not fully mounted yet. However, we
+ * currently allow this as a convenience for mutating the initial state.
+ *
+ * currentlyUnmountingInstance: During the unmounting phase, the instance is
+ * still mounted and can therefore schedule an update. However, this is not
+ * recommended and probably an error since it's about to be unmounted.
+ * Therefore we still want to trigger in an error for that case.
  */
-function proxyStaticMethods(target, source) {
-  if (typeof source !== 'function') {
-    return;
-  }
-  for (var key in source) {
-    if (source.hasOwnProperty(key)) {
-      var value = source[key];
-      if (typeof value === 'function') {
-        var bound = value.bind(source);
-        // Copy any properties defined on the function, such as `isRequired` on
-        // a PropTypes validator.
-        for (var k in value) {
-          if (value.hasOwnProperty(k)) {
-            bound[k] = value[k];
-          }
-        }
-        target[key] = bound;
-      } else {
-        target[key] = value;
-      }
-    }
-  }
-}
 
-// We use an object instead of a boolean because booleans are ignored by our
-// mocking libraries when these factories gets mocked.
-var LEGACY_MARKER = {};
-var NON_LEGACY_MARKER = {};
-
-var ReactLegacyElementFactory = {};
-
-ReactLegacyElementFactory.wrapCreateFactory = function(createFactory) {
-  var legacyCreateFactory = function(type) {
-    if (typeof type !== 'function') {
-      // Non-function types cannot be legacy factories
-      return createFactory(type);
-    }
-
-    if (type.isReactNonLegacyFactory) {
-      // This is probably a factory created by ReactDOM we unwrap it to get to
-      // the underlying string type. It shouldn't have been passed here so we
-      // warn.
-      if ("production" !== process.env.NODE_ENV) {
-        warnForNonLegacyFactory(type);
-      }
-      return createFactory(type.type);
-    }
-
-    if (type.isReactLegacyFactory) {
-      // This is probably a legacy factory created by ReactCompositeComponent.
-      // We unwrap it to get to the underlying class.
-      return createFactory(type.type);
-    }
-
-    if ("production" !== process.env.NODE_ENV) {
-      warnForPlainFunctionType(type);
-    }
-
-    // Unless it's a legacy factory, then this is probably a plain function,
-    // that is expecting to be invoked by JSX. We can just return it as is.
-    return type;
-  };
-  return legacyCreateFactory;
+var ReactLifeCycle = {
+  currentlyMountingInstance: null,
+  currentlyUnmountingInstance: null
 };
 
-ReactLegacyElementFactory.wrapCreateElement = function(createElement) {
-  var legacyCreateElement = function(type, props, children) {
-    if (typeof type !== 'function') {
-      // Non-function types cannot be legacy factories
-      return createElement.apply(this, arguments);
-    }
+module.exports = ReactLifeCycle;
 
-    var args;
-
-    if (type.isReactNonLegacyFactory) {
-      // This is probably a factory created by ReactDOM we unwrap it to get to
-      // the underlying string type. It shouldn't have been passed here so we
-      // warn.
-      if ("production" !== process.env.NODE_ENV) {
-        warnForNonLegacyFactory(type);
-      }
-      args = Array.prototype.slice.call(arguments, 0);
-      args[0] = type.type;
-      return createElement.apply(this, args);
-    }
-
-    if (type.isReactLegacyFactory) {
-      // This is probably a legacy factory created by ReactCompositeComponent.
-      // We unwrap it to get to the underlying class.
-      if (type._isMockFunction) {
-        // If this is a mock function, people will expect it to be called. We
-        // will actually call the original mock factory function instead. This
-        // future proofs unit testing that assume that these are classes.
-        type.type._mockedReactClassConstructor = type;
-      }
-      args = Array.prototype.slice.call(arguments, 0);
-      args[0] = type.type;
-      return createElement.apply(this, args);
-    }
-
-    if ("production" !== process.env.NODE_ENV) {
-      warnForPlainFunctionType(type);
-    }
-
-    // This is being called with a plain function we should invoke it
-    // immediately as if this was used with legacy JSX.
-    return type.apply(null, Array.prototype.slice.call(arguments, 1));
-  };
-  return legacyCreateElement;
-};
-
-ReactLegacyElementFactory.wrapFactory = function(factory) {
-  ("production" !== process.env.NODE_ENV ? invariant(
-    typeof factory === 'function',
-    'This is suppose to accept a element factory'
-  ) : invariant(typeof factory === 'function'));
-  var legacyElementFactory = function(config, children) {
-    // This factory should not be called when JSX is used. Use JSX instead.
-    if ("production" !== process.env.NODE_ENV) {
-      warnForLegacyFactoryCall();
-    }
-    return factory.apply(this, arguments);
-  };
-  proxyStaticMethods(legacyElementFactory, factory.type);
-  legacyElementFactory.isReactLegacyFactory = LEGACY_MARKER;
-  legacyElementFactory.type = factory.type;
-  return legacyElementFactory;
-};
-
-// This is used to mark a factory that will remain. E.g. we're allowed to call
-// it as a function. However, you're not suppose to pass it to createElement
-// or createFactory, so it will warn you if you do.
-ReactLegacyElementFactory.markNonLegacyFactory = function(factory) {
-  factory.isReactNonLegacyFactory = NON_LEGACY_MARKER;
-  return factory;
-};
-
-// Checks if a factory function is actually a legacy factory pretending to
-// be a class.
-ReactLegacyElementFactory.isValidFactory = function(factory) {
-  // TODO: This will be removed and moved into a class validator or something.
-  return typeof factory === 'function' &&
-    factory.isReactLegacyFactory === LEGACY_MARKER;
-};
-
-ReactLegacyElementFactory.isValidClass = function(factory) {
-  if ("production" !== process.env.NODE_ENV) {
-    ("production" !== process.env.NODE_ENV ? warning(
-      false,
-      'isValidClass is deprecated and will be removed in a future release. ' +
-      'Use a more specific validator instead.'
-    ) : null);
-  }
-  return ReactLegacyElementFactory.isValidFactory(factory);
-};
-
-ReactLegacyElementFactory._isLegacyCallWarningEnabled = true;
-
-module.exports = ReactLegacyElementFactory;
-
-}).call(this,require('_process'))
-},{"./ReactCurrentOwner":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactCurrentOwner.js","./invariant":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/invariant.js","./monitorCodeUse":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/monitorCodeUse.js","./warning":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/warning.js","_process":"/Users/sahat/Projects/trip-planner/node_modules/browserify/node_modules/process/browser.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactMarkupChecksum.js":[function(require,module,exports){
+},{}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactMarkupChecksum.js":[function(require,module,exports){
 /**
  * Copyright 2013-2014, Facebook, Inc.
  * All rights reserved.
@@ -11130,7 +11569,7 @@ module.exports = ReactLegacyElementFactory;
  * @providesModule ReactMarkupChecksum
  */
 
-"use strict";
+'use strict';
 
 var adler32 = require("./adler32");
 
@@ -11179,27 +11618,30 @@ module.exports = ReactMarkupChecksum;
  * @providesModule ReactMount
  */
 
-"use strict";
+'use strict';
 
 var DOMProperty = require("./DOMProperty");
 var ReactBrowserEventEmitter = require("./ReactBrowserEventEmitter");
 var ReactCurrentOwner = require("./ReactCurrentOwner");
 var ReactElement = require("./ReactElement");
-var ReactLegacyElement = require("./ReactLegacyElement");
+var ReactElementValidator = require("./ReactElementValidator");
+var ReactEmptyComponent = require("./ReactEmptyComponent");
 var ReactInstanceHandles = require("./ReactInstanceHandles");
+var ReactInstanceMap = require("./ReactInstanceMap");
+var ReactMarkupChecksum = require("./ReactMarkupChecksum");
 var ReactPerf = require("./ReactPerf");
+var ReactReconciler = require("./ReactReconciler");
+var ReactUpdateQueue = require("./ReactUpdateQueue");
+var ReactUpdates = require("./ReactUpdates");
 
+var emptyObject = require("./emptyObject");
 var containsNode = require("./containsNode");
-var deprecated = require("./deprecated");
 var getReactRootElementInContainer = require("./getReactRootElementInContainer");
 var instantiateReactComponent = require("./instantiateReactComponent");
 var invariant = require("./invariant");
+var setInnerHTML = require("./setInnerHTML");
 var shouldUpdateReactComponent = require("./shouldUpdateReactComponent");
 var warning = require("./warning");
-
-var createElement = ReactLegacyElement.wrapCreateElement(
-  ReactElement.createElement
-);
 
 var SEPARATOR = ReactInstanceHandles.SEPARATOR;
 
@@ -11222,6 +11664,22 @@ if ("production" !== process.env.NODE_ENV) {
 
 // Used to store breadth-first search state in findComponentRoot.
 var findComponentRootReusableArray = [];
+
+/**
+ * Finds the index of the first character
+ * that's not common between the two given strings.
+ *
+ * @return {number} the index of the character where the strings diverge
+ */
+function firstDifferenceIndex(string1, string2) {
+  var minLen = Math.min(string1.length, string2.length);
+  for (var i = 0; i < minLen; i++) {
+    if (string1.charAt(i) !== string2.charAt(i)) {
+      return i;
+    }
+  }
+  return string1.length === string2.length ? -1 : minLen;
+}
 
 /**
  * @param {DOMElement} container DOM element that may contain a React component.
@@ -11301,6 +11759,24 @@ function getNode(id) {
 }
 
 /**
+ * Finds the node with the supplied public React instance.
+ *
+ * @param {*} instance A public React instance.
+ * @return {?DOMElement} DOM node with the suppled `id`.
+ * @internal
+ */
+function getNodeFromInstance(instance) {
+  var id = ReactInstanceMap.get(instance)._rootNodeID;
+  if (ReactEmptyComponent.isNullComponentID(id)) {
+    return null;
+  }
+  if (!nodeCache.hasOwnProperty(id) || !isValid(nodeCache[id], id)) {
+    nodeCache[id] = ReactMount.findReactNodeByID(id);
+  }
+  return nodeCache[id];
+}
+
+/**
  * A node is "valid" if it is contained by a currently mounted container.
  *
  * This means that the node does not have to be contained by a document in
@@ -11364,6 +11840,54 @@ function findDeepestCachedAncestor(targetID) {
 }
 
 /**
+ * Mounts this component and inserts it into the DOM.
+ *
+ * @param {ReactComponent} componentInstance The instance to mount.
+ * @param {string} rootID DOM ID of the root node.
+ * @param {DOMElement} container DOM element to mount into.
+ * @param {ReactReconcileTransaction} transaction
+ * @param {boolean} shouldReuseMarkup If true, do not insert markup
+ */
+function mountComponentIntoNode(
+    componentInstance,
+    rootID,
+    container,
+    transaction,
+    shouldReuseMarkup) {
+  var markup = ReactReconciler.mountComponent(
+    componentInstance, rootID, transaction, emptyObject
+  );
+  componentInstance._isTopLevel = true;
+  ReactMount._mountImageIntoNode(markup, container, shouldReuseMarkup);
+}
+
+/**
+ * Batched mount.
+ *
+ * @param {ReactComponent} componentInstance The instance to mount.
+ * @param {string} rootID DOM ID of the root node.
+ * @param {DOMElement} container DOM element to mount into.
+ * @param {boolean} shouldReuseMarkup If true, do not insert markup
+ */
+function batchedMountComponentIntoNode(
+    componentInstance,
+    rootID,
+    container,
+    shouldReuseMarkup) {
+  var transaction = ReactUpdates.ReactReconcileTransaction.getPooled();
+  transaction.perform(
+    mountComponentIntoNode,
+    null,
+    componentInstance,
+    rootID,
+    container,
+    transaction,
+    shouldReuseMarkup
+  );
+  ReactUpdates.ReactReconcileTransaction.release(transaction);
+}
+
+/**
  * Mounting is the process of initializing a React component by creatings its
  * representative DOM elements and inserting them into a supplied `container`.
  * Any prior content inside `container` is destroyed in the process.
@@ -11400,18 +11924,24 @@ var ReactMount = {
   /**
    * Take a component that's already mounted into the DOM and replace its props
    * @param {ReactComponent} prevComponent component instance already in the DOM
-   * @param {ReactComponent} nextComponent component instance to render
+   * @param {ReactElement} nextElement component instance to render
    * @param {DOMElement} container container to render into
    * @param {?function} callback function triggered on completion
    */
   _updateRootComponent: function(
       prevComponent,
-      nextComponent,
+      nextElement,
       container,
       callback) {
-    var nextProps = nextComponent.props;
+    if ("production" !== process.env.NODE_ENV) {
+      ReactElementValidator.checkAndWarnForMutatedProps(nextElement);
+    }
+
     ReactMount.scrollMonitor(container, function() {
-      prevComponent.replaceProps(nextProps, callback);
+      ReactUpdateQueue.enqueueElementInternal(prevComponent, nextElement);
+      if (callback) {
+        ReactUpdateQueue.enqueueCallbackInternal(prevComponent, callback);
+      }
     });
 
     if ("production" !== process.env.NODE_ENV) {
@@ -11433,13 +11963,11 @@ var ReactMount = {
   _registerComponent: function(nextComponent, container) {
     ("production" !== process.env.NODE_ENV ? invariant(
       container && (
-        container.nodeType === ELEMENT_NODE_TYPE ||
-        container.nodeType === DOC_NODE_TYPE
+        (container.nodeType === ELEMENT_NODE_TYPE || container.nodeType === DOC_NODE_TYPE)
       ),
       '_registerComponent(...): Target container is not a DOM element.'
     ) : invariant(container && (
-      container.nodeType === ELEMENT_NODE_TYPE ||
-      container.nodeType === DOC_NODE_TYPE
+      (container.nodeType === ELEMENT_NODE_TYPE || container.nodeType === DOC_NODE_TYPE)
     )));
 
     ReactBrowserEventEmitter.ensureScrollValueMonitoring();
@@ -11456,44 +11984,48 @@ var ReactMount = {
    * @param {boolean} shouldReuseMarkup if we should skip the markup insertion
    * @return {ReactComponent} nextComponent
    */
-  _renderNewRootComponent: ReactPerf.measure(
-    'ReactMount',
-    '_renderNewRootComponent',
-    function(
-        nextComponent,
-        container,
-        shouldReuseMarkup) {
-      // Various parts of our code (such as ReactCompositeComponent's
-      // _renderValidatedComponent) assume that calls to render aren't nested;
-      // verify that that's the case.
-      ("production" !== process.env.NODE_ENV ? warning(
-        ReactCurrentOwner.current == null,
-        '_renderNewRootComponent(): Render methods should be a pure function ' +
-        'of props and state; triggering nested component updates from ' +
-        'render is not allowed. If necessary, trigger nested updates in ' +
-        'componentDidUpdate.'
-      ) : null);
+  _renderNewRootComponent: function(
+    nextComponent,
+    container,
+    shouldReuseMarkup
+  ) {
+    // Various parts of our code (such as ReactCompositeComponent's
+    // _renderValidatedComponent) assume that calls to render aren't nested;
+    // verify that that's the case.
+    ("production" !== process.env.NODE_ENV ? warning(
+      ReactCurrentOwner.current == null,
+      '_renderNewRootComponent(): Render methods should be a pure function ' +
+      'of props and state; triggering nested component updates from ' +
+      'render is not allowed. If necessary, trigger nested updates in ' +
+      'componentDidUpdate.'
+    ) : null);
 
-      var componentInstance = instantiateReactComponent(nextComponent, null);
-      var reactRootID = ReactMount._registerComponent(
-        componentInstance,
-        container
-      );
-      componentInstance.mountComponentIntoNode(
-        reactRootID,
-        container,
-        shouldReuseMarkup
-      );
+    var componentInstance = instantiateReactComponent(nextComponent, null);
+    var reactRootID = ReactMount._registerComponent(
+      componentInstance,
+      container
+    );
 
-      if ("production" !== process.env.NODE_ENV) {
-        // Record the root element in case it later gets transplanted.
-        rootElementsByReactRootID[reactRootID] =
-          getReactRootElementInContainer(container);
-      }
+    // The initial render is synchronous but any updates that happen during
+    // rendering, in componentWillMount or componentDidMount, will be batched
+    // according to the current batching strategy.
 
-      return componentInstance;
+    ReactUpdates.batchedUpdates(
+      batchedMountComponentIntoNode,
+      componentInstance,
+      reactRootID,
+      container,
+      shouldReuseMarkup
+    );
+
+    if ("production" !== process.env.NODE_ENV) {
+      // Record the root element in case it later gets transplanted.
+      rootElementsByReactRootID[reactRootID] =
+        getReactRootElementInContainer(container);
     }
-  ),
+
+    return componentInstance;
+  },
 
   /**
    * Renders a React component into the DOM in the supplied `container`.
@@ -11510,16 +12042,16 @@ var ReactMount = {
   render: function(nextElement, container, callback) {
     ("production" !== process.env.NODE_ENV ? invariant(
       ReactElement.isValidElement(nextElement),
-      'renderComponent(): Invalid component element.%s',
+      'React.render(): Invalid component element.%s',
       (
         typeof nextElement === 'string' ?
           ' Instead of passing an element string, make sure to instantiate ' +
           'it by passing it to React.createElement.' :
-        ReactLegacyElement.isValidFactory(nextElement) ?
+        typeof nextElement === 'function' ?
           ' Instead of passing a component class, make sure to instantiate ' +
           'it by passing it to React.createElement.' :
-        // Check if it quacks like a element
-        typeof nextElement.props !== "undefined" ?
+        // Check if it quacks like an element
+        nextElement != null && nextElement.props !== undefined ?
           ' This may be caused by unintentionally loading two independent ' +
           'copies of React.' :
           ''
@@ -11536,7 +12068,7 @@ var ReactMount = {
           nextElement,
           container,
           callback
-        );
+        ).getPublicInstance();
       } else {
         ReactMount.unmountComponentAtNode(container);
       }
@@ -11552,8 +12084,10 @@ var ReactMount = {
       nextElement,
       container,
       shouldReuseMarkup
-    );
-    callback && callback.call(component);
+    ).getPublicInstance();
+    if (callback) {
+      callback.call(component);
+    }
     return component;
   },
 
@@ -11567,7 +12101,7 @@ var ReactMount = {
    * @return {ReactComponent} Component instance rendered in `container`.
    */
   constructAndRenderComponent: function(constructor, props, container) {
-    var element = createElement(constructor, props);
+    var element = ReactElement.createElement(constructor, props);
     return ReactMount.render(element, container);
   },
 
@@ -11632,6 +12166,15 @@ var ReactMount = {
       'componentDidUpdate.'
     ) : null);
 
+    ("production" !== process.env.NODE_ENV ? invariant(
+      container && (
+        (container.nodeType === ELEMENT_NODE_TYPE || container.nodeType === DOC_NODE_TYPE)
+      ),
+      'unmountComponentAtNode(...): Target container is not a DOM element.'
+    ) : invariant(container && (
+      (container.nodeType === ELEMENT_NODE_TYPE || container.nodeType === DOC_NODE_TYPE)
+    )));
+
     var reactRootID = getReactRootID(container);
     var component = instancesByReactRootID[reactRootID];
     if (!component) {
@@ -11656,7 +12199,7 @@ var ReactMount = {
    * @see {ReactMount.unmountComponentAtNode}
    */
   unmountComponentFromNode: function(instance, container) {
-    instance.unmountComponent();
+    ReactReconciler.unmountComponent(instance);
 
     if (container.nodeType === DOC_NODE_TYPE) {
       container = container.documentElement;
@@ -11836,6 +12379,75 @@ var ReactMount = {
     ) : invariant(false));
   },
 
+  _mountImageIntoNode: function(markup, container, shouldReuseMarkup) {
+    ("production" !== process.env.NODE_ENV ? invariant(
+      container && (
+        (container.nodeType === ELEMENT_NODE_TYPE || container.nodeType === DOC_NODE_TYPE)
+      ),
+      'mountComponentIntoNode(...): Target container is not valid.'
+    ) : invariant(container && (
+      (container.nodeType === ELEMENT_NODE_TYPE || container.nodeType === DOC_NODE_TYPE)
+    )));
+
+    if (shouldReuseMarkup) {
+      var rootElement = getReactRootElementInContainer(container);
+      if (ReactMarkupChecksum.canReuseMarkup(markup, rootElement)) {
+        return;
+      } else {
+        var checksum = rootElement.getAttribute(
+          ReactMarkupChecksum.CHECKSUM_ATTR_NAME
+        );
+        rootElement.removeAttribute(ReactMarkupChecksum.CHECKSUM_ATTR_NAME);
+
+        var rootMarkup = rootElement.outerHTML;
+        rootElement.setAttribute(
+          ReactMarkupChecksum.CHECKSUM_ATTR_NAME,
+          checksum
+        );
+
+        var diffIndex = firstDifferenceIndex(markup, rootMarkup);
+        var difference = ' (client) ' +
+          markup.substring(diffIndex - 20, diffIndex + 20) +
+          '\n (server) ' + rootMarkup.substring(diffIndex - 20, diffIndex + 20);
+
+        ("production" !== process.env.NODE_ENV ? invariant(
+          container.nodeType !== DOC_NODE_TYPE,
+          'You\'re trying to render a component to the document using ' +
+          'server rendering but the checksum was invalid. This usually ' +
+          'means you rendered a different component type or props on ' +
+          'the client from the one on the server, or your render() ' +
+          'methods are impure. React cannot handle this case due to ' +
+          'cross-browser quirks by rendering at the document root. You ' +
+          'should look for environment dependent code in your components ' +
+          'and ensure the props are the same client and server side:\n%s',
+          difference
+        ) : invariant(container.nodeType !== DOC_NODE_TYPE));
+
+        if ("production" !== process.env.NODE_ENV) {
+          console.warn(
+            'React attempted to reuse markup in a container but the ' +
+            'checksum was invalid. This generally means that you are ' +
+            'using server rendering and the markup generated on the ' +
+            'server was not what the client was expecting. React injected ' +
+            'new markup to compensate which works but you have lost many ' +
+            'of the benefits of server rendering. Instead, figure out ' +
+            'why the markup being generated is different on the client ' +
+            'or server:\n' + difference
+          );
+        }
+      }
+    }
+
+    ("production" !== process.env.NODE_ENV ? invariant(
+      container.nodeType !== DOC_NODE_TYPE,
+      'You\'re trying to render a component to the document but ' +
+        'you didn\'t use server rendering. We can\'t do this ' +
+        'without using server rendering due to cross-browser quirks. ' +
+        'See React.renderToString() for server rendering.'
+    ) : invariant(container.nodeType !== DOC_NODE_TYPE));
+
+    setInnerHTML(container, markup);
+  },
 
   /**
    * React ID utilities.
@@ -11849,22 +12461,20 @@ var ReactMount = {
 
   getNode: getNode,
 
+  getNodeFromInstance: getNodeFromInstance,
+
   purgeID: purgeID
 };
 
-// Deprecations (remove for 0.13)
-ReactMount.renderComponent = deprecated(
-  'ReactMount',
-  'renderComponent',
-  'render',
-  this,
-  ReactMount.render
-);
+ReactPerf.measureMethods(ReactMount, 'ReactMount', {
+  _renderNewRootComponent: '_renderNewRootComponent',
+  _mountImageIntoNode: '_mountImageIntoNode'
+});
 
 module.exports = ReactMount;
 
 }).call(this,require('_process'))
-},{"./DOMProperty":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/DOMProperty.js","./ReactBrowserEventEmitter":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactBrowserEventEmitter.js","./ReactCurrentOwner":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactCurrentOwner.js","./ReactElement":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactElement.js","./ReactInstanceHandles":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactInstanceHandles.js","./ReactLegacyElement":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactLegacyElement.js","./ReactPerf":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactPerf.js","./containsNode":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/containsNode.js","./deprecated":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/deprecated.js","./getReactRootElementInContainer":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/getReactRootElementInContainer.js","./instantiateReactComponent":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/instantiateReactComponent.js","./invariant":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/invariant.js","./shouldUpdateReactComponent":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/shouldUpdateReactComponent.js","./warning":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/warning.js","_process":"/Users/sahat/Projects/trip-planner/node_modules/browserify/node_modules/process/browser.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactMultiChild.js":[function(require,module,exports){
+},{"./DOMProperty":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/DOMProperty.js","./ReactBrowserEventEmitter":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactBrowserEventEmitter.js","./ReactCurrentOwner":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactCurrentOwner.js","./ReactElement":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactElement.js","./ReactElementValidator":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactElementValidator.js","./ReactEmptyComponent":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactEmptyComponent.js","./ReactInstanceHandles":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactInstanceHandles.js","./ReactInstanceMap":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactInstanceMap.js","./ReactMarkupChecksum":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactMarkupChecksum.js","./ReactPerf":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactPerf.js","./ReactReconciler":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactReconciler.js","./ReactUpdateQueue":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactUpdateQueue.js","./ReactUpdates":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactUpdates.js","./containsNode":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/containsNode.js","./emptyObject":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/emptyObject.js","./getReactRootElementInContainer":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/getReactRootElementInContainer.js","./instantiateReactComponent":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/instantiateReactComponent.js","./invariant":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/invariant.js","./setInnerHTML":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/setInnerHTML.js","./shouldUpdateReactComponent":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/shouldUpdateReactComponent.js","./warning":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/warning.js","_process":"/Users/sahat/Projects/trip-planner/node_modules/browserify/node_modules/process/browser.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactMultiChild.js":[function(require,module,exports){
 /**
  * Copyright 2013-2014, Facebook, Inc.
  * All rights reserved.
@@ -11877,14 +12487,13 @@ module.exports = ReactMount;
  * @typechecks static-only
  */
 
-"use strict";
+'use strict';
 
-var ReactComponent = require("./ReactComponent");
+var ReactComponentEnvironment = require("./ReactComponentEnvironment");
 var ReactMultiChildUpdateTypes = require("./ReactMultiChildUpdateTypes");
 
-var flattenChildren = require("./flattenChildren");
-var instantiateReactComponent = require("./instantiateReactComponent");
-var shouldUpdateReactComponent = require("./shouldUpdateReactComponent");
+var ReactReconciler = require("./ReactReconciler");
+var ReactChildReconciler = require("./ReactChildReconciler");
 
 /**
  * Updating children of a component may trigger recursive updates. The depth is
@@ -12002,7 +12611,7 @@ function enqueueTextContent(parentID, textContent) {
  */
 function processQueue() {
   if (updateQueue.length) {
-    ReactComponent.BackendIDOperations.dangerouslyProcessChildrenUpdates(
+    ReactComponentEnvironment.processChildrenUpdates(
       updateQueue,
       markupQueue
     );
@@ -12045,26 +12654,25 @@ var ReactMultiChild = {
      * @return {array} An array of mounted representations.
      * @internal
      */
-    mountChildren: function(nestedChildren, transaction) {
-      var children = flattenChildren(nestedChildren);
+    mountChildren: function(nestedChildren, transaction, context) {
+      var children = ReactChildReconciler.instantiateChildren(
+        nestedChildren, transaction, context
+      );
+      this._renderedChildren = children;
       var mountImages = [];
       var index = 0;
-      this._renderedChildren = children;
       for (var name in children) {
-        var child = children[name];
         if (children.hasOwnProperty(name)) {
-          // The rendered children must be turned into instances as they're
-          // mounted.
-          var childInstance = instantiateReactComponent(child, null);
-          children[name] = childInstance;
+          var child = children[name];
           // Inlined for performance, see `ReactInstanceHandles.createReactID`.
           var rootID = this._rootNodeID + name;
-          var mountImage = childInstance.mountComponent(
+          var mountImage = ReactReconciler.mountComponent(
+            child,
             rootID,
             transaction,
-            this._mountDepth + 1
+            context
           );
-          childInstance._mountIndex = index;
+          child._mountIndex = index;
           mountImages.push(mountImage);
           index++;
         }
@@ -12084,6 +12692,8 @@ var ReactMultiChild = {
       try {
         var prevChildren = this._renderedChildren;
         // Remove any rendered children.
+        ReactChildReconciler.unmountChildren(prevChildren);
+        // TODO: The setTextContent operation should be enough
         for (var name in prevChildren) {
           if (prevChildren.hasOwnProperty(name)) {
             this._unmountChildByName(prevChildren[name], name);
@@ -12095,7 +12705,11 @@ var ReactMultiChild = {
       } finally {
         updateDepth--;
         if (!updateDepth) {
-          errorThrown ? clearQueue() : processQueue();
+          if (errorThrown) {
+            clearQueue();
+          } else {
+            processQueue();
+          }
         }
       }
     },
@@ -12107,17 +12721,22 @@ var ReactMultiChild = {
      * @param {ReactReconcileTransaction} transaction
      * @internal
      */
-    updateChildren: function(nextNestedChildren, transaction) {
+    updateChildren: function(nextNestedChildren, transaction, context) {
       updateDepth++;
       var errorThrown = true;
       try {
-        this._updateChildren(nextNestedChildren, transaction);
+        this._updateChildren(nextNestedChildren, transaction, context);
         errorThrown = false;
       } finally {
         updateDepth--;
         if (!updateDepth) {
-          errorThrown ? clearQueue() : processQueue();
+          if (errorThrown) {
+            clearQueue();
+          } else {
+            processQueue();
+          }
         }
+
       }
     },
 
@@ -12130,9 +12749,12 @@ var ReactMultiChild = {
      * @final
      * @protected
      */
-    _updateChildren: function(nextNestedChildren, transaction) {
-      var nextChildren = flattenChildren(nextNestedChildren);
+    _updateChildren: function(nextNestedChildren, transaction, context) {
       var prevChildren = this._renderedChildren;
+      var nextChildren = ReactChildReconciler.updateChildren(
+        prevChildren, nextNestedChildren, transaction, context
+      );
+      this._renderedChildren = nextChildren;
       if (!nextChildren && !prevChildren) {
         return;
       }
@@ -12146,12 +12768,10 @@ var ReactMultiChild = {
           continue;
         }
         var prevChild = prevChildren && prevChildren[name];
-        var prevElement = prevChild && prevChild._currentElement;
-        var nextElement = nextChildren[name];
-        if (shouldUpdateReactComponent(prevElement, nextElement)) {
+        var nextChild = nextChildren[name];
+        if (prevChild === nextChild) {
           this.moveChild(prevChild, nextIndex, lastIndex);
           lastIndex = Math.max(prevChild._mountIndex, lastIndex);
-          prevChild.receiveComponent(nextElement, transaction);
           prevChild._mountIndex = nextIndex;
         } else {
           if (prevChild) {
@@ -12160,12 +12780,8 @@ var ReactMultiChild = {
             this._unmountChildByName(prevChild, name);
           }
           // The child must be instantiated before it's mounted.
-          var nextChildInstance = instantiateReactComponent(
-            nextElement,
-            null
-          );
           this._mountChildByNameAtIndex(
-            nextChildInstance, name, nextIndex, transaction
+            nextChild, name, nextIndex, transaction, context
           );
         }
         nextIndex++;
@@ -12173,7 +12789,7 @@ var ReactMultiChild = {
       // Remove children that are no longer present.
       for (name in prevChildren) {
         if (prevChildren.hasOwnProperty(name) &&
-            !(nextChildren && nextChildren[name])) {
+            !(nextChildren && nextChildren.hasOwnProperty(name))) {
           this._unmountChildByName(prevChildren[name], name);
         }
       }
@@ -12187,13 +12803,7 @@ var ReactMultiChild = {
      */
     unmountChildren: function() {
       var renderedChildren = this._renderedChildren;
-      for (var name in renderedChildren) {
-        var renderedChild = renderedChildren[name];
-        // TODO: When is this not true?
-        if (renderedChild.unmountComponent) {
-          renderedChild.unmountComponent();
-        }
-      }
+      ReactChildReconciler.unmountChildren(renderedChildren);
       this._renderedChildren = null;
     },
 
@@ -12256,18 +12866,22 @@ var ReactMultiChild = {
      * @param {ReactReconcileTransaction} transaction
      * @private
      */
-    _mountChildByNameAtIndex: function(child, name, index, transaction) {
+    _mountChildByNameAtIndex: function(
+      child,
+      name,
+      index,
+      transaction,
+      context) {
       // Inlined for performance, see `ReactInstanceHandles.createReactID`.
       var rootID = this._rootNodeID + name;
-      var mountImage = child.mountComponent(
+      var mountImage = ReactReconciler.mountComponent(
+        child,
         rootID,
         transaction,
-        this._mountDepth + 1
+        context
       );
       child._mountIndex = index;
       this.createChild(child, mountImage);
-      this._renderedChildren = this._renderedChildren || {};
-      this._renderedChildren[name] = child;
     },
 
     /**
@@ -12282,8 +12896,6 @@ var ReactMultiChild = {
     _unmountChildByName: function(child, name) {
       this.removeChild(child);
       child._mountIndex = null;
-      child.unmountComponent();
-      delete this._renderedChildren[name];
     }
 
   }
@@ -12292,7 +12904,7 @@ var ReactMultiChild = {
 
 module.exports = ReactMultiChild;
 
-},{"./ReactComponent":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactComponent.js","./ReactMultiChildUpdateTypes":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactMultiChildUpdateTypes.js","./flattenChildren":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/flattenChildren.js","./instantiateReactComponent":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/instantiateReactComponent.js","./shouldUpdateReactComponent":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/shouldUpdateReactComponent.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactMultiChildUpdateTypes.js":[function(require,module,exports){
+},{"./ReactChildReconciler":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactChildReconciler.js","./ReactComponentEnvironment":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactComponentEnvironment.js","./ReactMultiChildUpdateTypes":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactMultiChildUpdateTypes.js","./ReactReconciler":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactReconciler.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactMultiChildUpdateTypes.js":[function(require,module,exports){
 /**
  * Copyright 2013-2014, Facebook, Inc.
  * All rights reserved.
@@ -12304,7 +12916,7 @@ module.exports = ReactMultiChild;
  * @providesModule ReactMultiChildUpdateTypes
  */
 
-"use strict";
+'use strict';
 
 var keyMirror = require("./keyMirror");
 
@@ -12338,7 +12950,10 @@ module.exports = ReactMultiChildUpdateTypes;
  * @providesModule ReactNativeComponent
  */
 
-"use strict";
+'use strict';
+
+var ReactClass = require("./ReactClass");
+var ReactElement = require("./ReactElement");
 
 var assign = require("./Object.assign");
 var invariant = require("./invariant");
@@ -12346,12 +12961,18 @@ var invariant = require("./invariant");
 var genericComponentClass = null;
 // This registry keeps track of wrapper classes around native tags
 var tagToComponentClass = {};
+var textComponentClass = null;
 
 var ReactNativeComponentInjection = {
   // This accepts a class that receives the tag string. This is a catch all
   // that can render any kind of tag.
   injectGenericComponentClass: function(componentClass) {
     genericComponentClass = componentClass;
+  },
+  // This accepts a text component class that takes the text string to be
+  // rendered as props.
+  injectTextComponentClass: function(componentClass) {
+    textComponentClass = componentClass;
   },
   // This accepts a keyed object with classes as values. Each key represents a
   // tag. That particular tag will use this class instead of the generic one.
@@ -12360,45 +12981,83 @@ var ReactNativeComponentInjection = {
   }
 };
 
+function autoGenerateWrapperClass(type) {
+  return ReactClass.createClass({
+    tagName: type.toUpperCase(),
+    render: function() {
+      return new ReactElement(
+        type,
+        null,
+        null,
+        null,
+        null,
+        this.props
+      );
+    }
+  });
+}
+
 /**
- * Create an internal class for a specific tag.
+ * Get a composite component wrapper class for a specific tag.
  *
- * @param {string} tag The tag for which to create an internal instance.
- * @param {any} props The props passed to the instance constructor.
- * @return {ReactComponent} component The injected empty component.
+ * @param {ReactElement} element The tag for which to get the class.
+ * @return {function} The React class constructor function.
  */
-function createInstanceForTag(tag, props, parentType) {
+function getComponentClassForElement(element) {
+  if (typeof element.type === 'function') {
+    return element.type;
+  }
+  var tag = element.type;
   var componentClass = tagToComponentClass[tag];
   if (componentClass == null) {
-    ("production" !== process.env.NODE_ENV ? invariant(
-      genericComponentClass,
-      'There is no registered component for the tag %s',
-      tag
-    ) : invariant(genericComponentClass));
-    return new genericComponentClass(tag, props);
+    tagToComponentClass[tag] = componentClass = autoGenerateWrapperClass(tag);
   }
-  if (parentType === tag) {
-    // Avoid recursion
-    ("production" !== process.env.NODE_ENV ? invariant(
-      genericComponentClass,
-      'There is no registered component for the tag %s',
-      tag
-    ) : invariant(genericComponentClass));
-    return new genericComponentClass(tag, props);
-  }
-  // Unwrap legacy factories
-  return new componentClass.type(props);
+  return componentClass;
+}
+
+/**
+ * Get a native internal component class for a specific tag.
+ *
+ * @param {ReactElement} element The element to create.
+ * @return {function} The internal class constructor function.
+ */
+function createInternalComponent(element) {
+  ("production" !== process.env.NODE_ENV ? invariant(
+    genericComponentClass,
+    'There is no registered component for the tag %s',
+    element.type
+  ) : invariant(genericComponentClass));
+  return new genericComponentClass(element.type, element.props);
+}
+
+/**
+ * @param {ReactText} text
+ * @return {ReactComponent}
+ */
+function createInstanceForText(text) {
+  return new textComponentClass(text);
+}
+
+/**
+ * @param {ReactComponent} component
+ * @return {boolean}
+ */
+function isTextComponent(component) {
+  return component instanceof textComponentClass;
 }
 
 var ReactNativeComponent = {
-  createInstanceForTag: createInstanceForTag,
+  getComponentClassForElement: getComponentClassForElement,
+  createInternalComponent: createInternalComponent,
+  createInstanceForText: createInstanceForText,
+  isTextComponent: isTextComponent,
   injection: ReactNativeComponentInjection
 };
 
 module.exports = ReactNativeComponent;
 
 }).call(this,require('_process'))
-},{"./Object.assign":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/Object.assign.js","./invariant":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/invariant.js","_process":"/Users/sahat/Projects/trip-planner/node_modules/browserify/node_modules/process/browser.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactOwner.js":[function(require,module,exports){
+},{"./Object.assign":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/Object.assign.js","./ReactClass":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactClass.js","./ReactElement":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactElement.js","./invariant":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/invariant.js","_process":"/Users/sahat/Projects/trip-planner/node_modules/browserify/node_modules/process/browser.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactOwner.js":[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2014, Facebook, Inc.
@@ -12411,9 +13070,8 @@ module.exports = ReactNativeComponent;
  * @providesModule ReactOwner
  */
 
-"use strict";
+'use strict';
 
-var emptyObject = require("./emptyObject");
 var invariant = require("./invariant");
 
 /**
@@ -12455,9 +13113,8 @@ var ReactOwner = {
    */
   isValidOwner: function(object) {
     return !!(
-      object &&
-      typeof object.attachRef === 'function' &&
-      typeof object.detachRef === 'function'
+      (object &&
+      typeof object.attachRef === 'function' && typeof object.detachRef === 'function')
     );
   },
 
@@ -12502,51 +13159,9 @@ var ReactOwner = {
     ) : invariant(ReactOwner.isValidOwner(owner)));
     // Check that `component` is still the current ref because we do not want to
     // detach the ref if another component stole it.
-    if (owner.refs[ref] === component) {
+    if (owner.getPublicInstance().refs[ref] === component.getPublicInstance()) {
       owner.detachRef(ref);
     }
-  },
-
-  /**
-   * A ReactComponent must mix this in to have refs.
-   *
-   * @lends {ReactOwner.prototype}
-   */
-  Mixin: {
-
-    construct: function() {
-      this.refs = emptyObject;
-    },
-
-    /**
-     * Lazily allocates the refs object and stores `component` as `ref`.
-     *
-     * @param {string} ref Reference name.
-     * @param {component} component Component to store as `ref`.
-     * @final
-     * @private
-     */
-    attachRef: function(ref, component) {
-      ("production" !== process.env.NODE_ENV ? invariant(
-        component.isOwnedBy(this),
-        'attachRef(%s, ...): Only a component\'s owner can store a ref to it.',
-        ref
-      ) : invariant(component.isOwnedBy(this)));
-      var refs = this.refs === emptyObject ? (this.refs = {}) : this.refs;
-      refs[ref] = component;
-    },
-
-    /**
-     * Detaches a reference name.
-     *
-     * @param {string} ref Name to dereference.
-     * @final
-     * @private
-     */
-    detachRef: function(ref) {
-      delete this.refs[ref];
-    }
-
   }
 
 };
@@ -12554,7 +13169,7 @@ var ReactOwner = {
 module.exports = ReactOwner;
 
 }).call(this,require('_process'))
-},{"./emptyObject":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/emptyObject.js","./invariant":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/invariant.js","_process":"/Users/sahat/Projects/trip-planner/node_modules/browserify/node_modules/process/browser.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactPerf.js":[function(require,module,exports){
+},{"./invariant":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/invariant.js","_process":"/Users/sahat/Projects/trip-planner/node_modules/browserify/node_modules/process/browser.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactPerf.js":[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2014, Facebook, Inc.
@@ -12568,7 +13183,7 @@ module.exports = ReactOwner;
  * @typechecks static-only
  */
 
-"use strict";
+'use strict';
 
 /**
  * ReactPerf is a general AOP system designed to measure performance. This
@@ -12586,6 +13201,26 @@ var ReactPerf = {
    * anything, but we'll override this if we inject a measure function.
    */
   storedMeasure: _noMeasure,
+
+  /**
+   * @param {object} object
+   * @param {string} objectName
+   * @param {object<string>} methodNames
+   */
+  measureMethods: function(object, objectName, methodNames) {
+    if ("production" !== process.env.NODE_ENV) {
+      for (var key in methodNames) {
+        if (!methodNames.hasOwnProperty(key)) {
+          continue;
+        }
+        object[key] = ReactPerf.measure(
+          objectName,
+          methodNames[key],
+          object[key]
+        );
+      }
+    }
+  },
 
   /**
    * Use this to wrap methods you want to measure. Zero overhead in production.
@@ -12638,174 +13273,7 @@ function _noMeasure(objName, fnName, func) {
 module.exports = ReactPerf;
 
 }).call(this,require('_process'))
-},{"_process":"/Users/sahat/Projects/trip-planner/node_modules/browserify/node_modules/process/browser.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactPropTransferer.js":[function(require,module,exports){
-(function (process){
-/**
- * Copyright 2013-2014, Facebook, Inc.
- * All rights reserved.
- *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
- *
- * @providesModule ReactPropTransferer
- */
-
-"use strict";
-
-var assign = require("./Object.assign");
-var emptyFunction = require("./emptyFunction");
-var invariant = require("./invariant");
-var joinClasses = require("./joinClasses");
-var warning = require("./warning");
-
-var didWarn = false;
-
-/**
- * Creates a transfer strategy that will merge prop values using the supplied
- * `mergeStrategy`. If a prop was previously unset, this just sets it.
- *
- * @param {function} mergeStrategy
- * @return {function}
- */
-function createTransferStrategy(mergeStrategy) {
-  return function(props, key, value) {
-    if (!props.hasOwnProperty(key)) {
-      props[key] = value;
-    } else {
-      props[key] = mergeStrategy(props[key], value);
-    }
-  };
-}
-
-var transferStrategyMerge = createTransferStrategy(function(a, b) {
-  // `merge` overrides the first object's (`props[key]` above) keys using the
-  // second object's (`value`) keys. An object's style's existing `propA` would
-  // get overridden. Flip the order here.
-  return assign({}, b, a);
-});
-
-/**
- * Transfer strategies dictate how props are transferred by `transferPropsTo`.
- * NOTE: if you add any more exceptions to this list you should be sure to
- * update `cloneWithProps()` accordingly.
- */
-var TransferStrategies = {
-  /**
-   * Never transfer `children`.
-   */
-  children: emptyFunction,
-  /**
-   * Transfer the `className` prop by merging them.
-   */
-  className: createTransferStrategy(joinClasses),
-  /**
-   * Transfer the `style` prop (which is an object) by merging them.
-   */
-  style: transferStrategyMerge
-};
-
-/**
- * Mutates the first argument by transferring the properties from the second
- * argument.
- *
- * @param {object} props
- * @param {object} newProps
- * @return {object}
- */
-function transferInto(props, newProps) {
-  for (var thisKey in newProps) {
-    if (!newProps.hasOwnProperty(thisKey)) {
-      continue;
-    }
-
-    var transferStrategy = TransferStrategies[thisKey];
-
-    if (transferStrategy && TransferStrategies.hasOwnProperty(thisKey)) {
-      transferStrategy(props, thisKey, newProps[thisKey]);
-    } else if (!props.hasOwnProperty(thisKey)) {
-      props[thisKey] = newProps[thisKey];
-    }
-  }
-  return props;
-}
-
-/**
- * ReactPropTransferer are capable of transferring props to another component
- * using a `transferPropsTo` method.
- *
- * @class ReactPropTransferer
- */
-var ReactPropTransferer = {
-
-  TransferStrategies: TransferStrategies,
-
-  /**
-   * Merge two props objects using TransferStrategies.
-   *
-   * @param {object} oldProps original props (they take precedence)
-   * @param {object} newProps new props to merge in
-   * @return {object} a new object containing both sets of props merged.
-   */
-  mergeProps: function(oldProps, newProps) {
-    return transferInto(assign({}, oldProps), newProps);
-  },
-
-  /**
-   * @lends {ReactPropTransferer.prototype}
-   */
-  Mixin: {
-
-    /**
-     * Transfer props from this component to a target component.
-     *
-     * Props that do not have an explicit transfer strategy will be transferred
-     * only if the target component does not already have the prop set.
-     *
-     * This is usually used to pass down props to a returned root component.
-     *
-     * @param {ReactElement} element Component receiving the properties.
-     * @return {ReactElement} The supplied `component`.
-     * @final
-     * @protected
-     */
-    transferPropsTo: function(element) {
-      ("production" !== process.env.NODE_ENV ? invariant(
-        element._owner === this,
-        '%s: You can\'t call transferPropsTo() on a component that you ' +
-        'don\'t own, %s. This usually means you are calling ' +
-        'transferPropsTo() on a component passed in as props or children.',
-        this.constructor.displayName,
-        typeof element.type === 'string' ?
-        element.type :
-        element.type.displayName
-      ) : invariant(element._owner === this));
-
-      if ("production" !== process.env.NODE_ENV) {
-        if (!didWarn) {
-          didWarn = true;
-          ("production" !== process.env.NODE_ENV ? warning(
-            false,
-            'transferPropsTo is deprecated. ' +
-            'See http://fb.me/react-transferpropsto for more information.'
-          ) : null);
-        }
-      }
-
-      // Because elements are immutable we have to merge into the existing
-      // props object rather than clone it.
-      transferInto(element.props, this.props);
-
-      return element;
-    }
-
-  }
-};
-
-module.exports = ReactPropTransferer;
-
-}).call(this,require('_process'))
-},{"./Object.assign":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/Object.assign.js","./emptyFunction":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/emptyFunction.js","./invariant":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/invariant.js","./joinClasses":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/joinClasses.js","./warning":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/warning.js","_process":"/Users/sahat/Projects/trip-planner/node_modules/browserify/node_modules/process/browser.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactPropTypeLocationNames.js":[function(require,module,exports){
+},{"_process":"/Users/sahat/Projects/trip-planner/node_modules/browserify/node_modules/process/browser.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactPropTypeLocationNames.js":[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2014, Facebook, Inc.
@@ -12818,7 +13286,7 @@ module.exports = ReactPropTransferer;
  * @providesModule ReactPropTypeLocationNames
  */
 
-"use strict";
+'use strict';
 
 var ReactPropTypeLocationNames = {};
 
@@ -12845,7 +13313,7 @@ module.exports = ReactPropTypeLocationNames;
  * @providesModule ReactPropTypeLocations
  */
 
-"use strict";
+'use strict';
 
 var keyMirror = require("./keyMirror");
 
@@ -12869,12 +13337,11 @@ module.exports = ReactPropTypeLocations;
  * @providesModule ReactPropTypes
  */
 
-"use strict";
+'use strict';
 
 var ReactElement = require("./ReactElement");
 var ReactPropTypeLocationNames = require("./ReactPropTypeLocationNames");
 
-var deprecated = require("./deprecated");
 var emptyFunction = require("./emptyFunction");
 
 /**
@@ -12945,22 +13412,7 @@ var ReactPropTypes = {
   objectOf: createObjectOfTypeChecker,
   oneOf: createEnumTypeChecker,
   oneOfType: createUnionTypeChecker,
-  shape: createShapeTypeChecker,
-
-  component: deprecated(
-    'React.PropTypes',
-    'component',
-    'element',
-    this,
-    elementTypeChecker
-  ),
-  renderable: deprecated(
-    'React.PropTypes',
-    'renderable',
-    'node',
-    this,
-    nodeTypeChecker
-  )
+  shape: createShapeTypeChecker
 };
 
 function createChainableTypeChecker(validate) {
@@ -12974,6 +13426,7 @@ function createChainableTypeChecker(validate) {
           ("`" + componentName + "`.")
         );
       }
+      return null;
     } else {
       return validate(props, propName, componentName, location);
     }
@@ -13001,12 +13454,13 @@ function createPrimitiveTypeChecker(expectedType) {
         ("supplied to `" + componentName + "`, expected `" + expectedType + "`.")
       );
     }
+    return null;
   }
   return createChainableTypeChecker(validate);
 }
 
 function createAnyTypeChecker() {
-  return createChainableTypeChecker(emptyFunction.thatReturns());
+  return createChainableTypeChecker(emptyFunction.thatReturns(null));
 }
 
 function createArrayOfTypeChecker(typeChecker) {
@@ -13026,6 +13480,7 @@ function createArrayOfTypeChecker(typeChecker) {
         return error;
       }
     }
+    return null;
   }
   return createChainableTypeChecker(validate);
 }
@@ -13039,6 +13494,7 @@ function createElementTypeChecker() {
         ("`" + componentName + "`, expected a ReactElement.")
       );
     }
+    return null;
   }
   return createChainableTypeChecker(validate);
 }
@@ -13053,6 +13509,7 @@ function createInstanceTypeChecker(expectedClass) {
         ("`" + componentName + "`, expected instance of `" + expectedClassName + "`.")
       );
     }
+    return null;
   }
   return createChainableTypeChecker(validate);
 }
@@ -13062,7 +13519,7 @@ function createEnumTypeChecker(expectedValues) {
     var propValue = props[propName];
     for (var i = 0; i < expectedValues.length; i++) {
       if (propValue === expectedValues[i]) {
-        return;
+        return null;
       }
     }
 
@@ -13095,6 +13552,7 @@ function createObjectOfTypeChecker(typeChecker) {
         }
       }
     }
+    return null;
   }
   return createChainableTypeChecker(validate);
 }
@@ -13104,7 +13562,7 @@ function createUnionTypeChecker(arrayOfTypeCheckers) {
     for (var i = 0; i < arrayOfTypeCheckers.length; i++) {
       var checker = arrayOfTypeCheckers[i];
       if (checker(props, propName, componentName, location) == null) {
-        return;
+        return null;
       }
     }
 
@@ -13126,6 +13584,7 @@ function createNodeChecker() {
         ("`" + componentName + "`, expected a ReactNode.")
       );
     }
+    return null;
   }
   return createChainableTypeChecker(validate);
 }
@@ -13151,12 +13610,13 @@ function createShapeTypeChecker(shapeTypes) {
         return error;
       }
     }
+    return null;
   }
   return createChainableTypeChecker(validate, 'expected `object`');
 }
 
 function isNode(propValue) {
-  switch(typeof propValue) {
+  switch (typeof propValue) {
     case 'number':
     case 'string':
       return true;
@@ -13211,7 +13671,7 @@ function getPreciseType(propValue) {
 
 module.exports = ReactPropTypes;
 
-},{"./ReactElement":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactElement.js","./ReactPropTypeLocationNames":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactPropTypeLocationNames.js","./deprecated":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/deprecated.js","./emptyFunction":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/emptyFunction.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactPutListenerQueue.js":[function(require,module,exports){
+},{"./ReactElement":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactElement.js","./ReactPropTypeLocationNames":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactPropTypeLocationNames.js","./emptyFunction":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/emptyFunction.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactPutListenerQueue.js":[function(require,module,exports){
 /**
  * Copyright 2013-2014, Facebook, Inc.
  * All rights reserved.
@@ -13223,7 +13683,7 @@ module.exports = ReactPropTypes;
  * @providesModule ReactPutListenerQueue
  */
 
-"use strict";
+'use strict';
 
 var PooledClass = require("./PooledClass");
 var ReactBrowserEventEmitter = require("./ReactBrowserEventEmitter");
@@ -13280,7 +13740,7 @@ module.exports = ReactPutListenerQueue;
  * @typechecks static-only
  */
 
-"use strict";
+'use strict';
 
 var CallbackQueue = require("./CallbackQueue");
 var PooledClass = require("./PooledClass");
@@ -13443,7 +13903,190 @@ PooledClass.addPoolingTo(ReactReconcileTransaction);
 
 module.exports = ReactReconcileTransaction;
 
-},{"./CallbackQueue":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/CallbackQueue.js","./Object.assign":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/Object.assign.js","./PooledClass":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/PooledClass.js","./ReactBrowserEventEmitter":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactBrowserEventEmitter.js","./ReactInputSelection":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactInputSelection.js","./ReactPutListenerQueue":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactPutListenerQueue.js","./Transaction":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/Transaction.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactRootIndex.js":[function(require,module,exports){
+},{"./CallbackQueue":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/CallbackQueue.js","./Object.assign":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/Object.assign.js","./PooledClass":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/PooledClass.js","./ReactBrowserEventEmitter":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactBrowserEventEmitter.js","./ReactInputSelection":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactInputSelection.js","./ReactPutListenerQueue":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactPutListenerQueue.js","./Transaction":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/Transaction.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactReconciler.js":[function(require,module,exports){
+(function (process){
+/**
+ * Copyright 2013-2014, Facebook, Inc.
+ * All rights reserved.
+ *
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
+ *
+ * @providesModule ReactReconciler
+ */
+
+'use strict';
+
+var ReactRef = require("./ReactRef");
+var ReactElementValidator = require("./ReactElementValidator");
+
+/**
+ * Helper to call ReactRef.attachRefs with this composite component, split out
+ * to avoid allocations in the transaction mount-ready queue.
+ */
+function attachRefs() {
+  ReactRef.attachRefs(this, this._currentElement);
+}
+
+var ReactReconciler = {
+
+  /**
+   * Initializes the component, renders markup, and registers event listeners.
+   *
+   * @param {ReactComponent} internalInstance
+   * @param {string} rootID DOM ID of the root node.
+   * @param {ReactReconcileTransaction|ReactServerRenderingTransaction} transaction
+   * @return {?string} Rendered markup to be inserted into the DOM.
+   * @final
+   * @internal
+   */
+  mountComponent: function(internalInstance, rootID, transaction, context) {
+    var markup = internalInstance.mountComponent(rootID, transaction, context);
+    if ("production" !== process.env.NODE_ENV) {
+      ReactElementValidator.checkAndWarnForMutatedProps(
+        internalInstance._currentElement
+      );
+    }
+    transaction.getReactMountReady().enqueue(attachRefs, internalInstance);
+    return markup;
+  },
+
+  /**
+   * Releases any resources allocated by `mountComponent`.
+   *
+   * @final
+   * @internal
+   */
+  unmountComponent: function(internalInstance) {
+    ReactRef.detachRefs(internalInstance, internalInstance._currentElement);
+    internalInstance.unmountComponent();
+  },
+
+  /**
+   * Update a component using a new element.
+   *
+   * @param {ReactComponent} internalInstance
+   * @param {ReactElement} nextElement
+   * @param {ReactReconcileTransaction} transaction
+   * @param {object} context
+   * @internal
+   */
+  receiveComponent: function(
+    internalInstance, nextElement, transaction, context
+  ) {
+    var prevElement = internalInstance._currentElement;
+
+    if (nextElement === prevElement && nextElement._owner != null) {
+      // Since elements are immutable after the owner is rendered,
+      // we can do a cheap identity compare here to determine if this is a
+      // superfluous reconcile. It's possible for state to be mutable but such
+      // change should trigger an update of the owner which would recreate
+      // the element. We explicitly check for the existence of an owner since
+      // it's possible for an element created outside a composite to be
+      // deeply mutated and reused.
+      return;
+    }
+
+    if ("production" !== process.env.NODE_ENV) {
+      ReactElementValidator.checkAndWarnForMutatedProps(nextElement);
+    }
+
+    var refsChanged = ReactRef.shouldUpdateRefs(
+      this,
+      prevElement,
+      nextElement
+    );
+
+    if (refsChanged) {
+      ReactRef.detachRefs(internalInstance, prevElement);
+    }
+
+    internalInstance.receiveComponent(nextElement, transaction, context);
+
+    if (refsChanged) {
+      transaction.getReactMountReady().enqueue(attachRefs, internalInstance);
+    }
+  }
+
+};
+
+module.exports = ReactReconciler;
+
+}).call(this,require('_process'))
+},{"./ReactElementValidator":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactElementValidator.js","./ReactRef":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactRef.js","_process":"/Users/sahat/Projects/trip-planner/node_modules/browserify/node_modules/process/browser.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactRef.js":[function(require,module,exports){
+/**
+ * Copyright 2013-2014, Facebook, Inc.
+ * All rights reserved.
+ *
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
+ *
+ * @providesModule ReactRef
+ */
+
+'use strict';
+
+var ReactOwner = require("./ReactOwner");
+var ReactUpdates = require("./ReactUpdates");
+
+var ReactRef = {};
+
+function attachRef(ref, component, owner) {
+  if (typeof ref === 'function') {
+    ref(component.getPublicInstance());
+  } else {
+    // Legacy ref
+    ReactOwner.addComponentAsRefTo(component, ref, owner);
+  }
+}
+
+function detachRef(ref, component, owner) {
+  if (typeof ref === 'function') {
+    ref(null);
+  } else {
+    // Legacy ref
+    ReactOwner.removeComponentAsRefFrom(component, ref, owner);
+  }
+}
+
+ReactRef.attachRefs = function(instance, element) {
+  var ref = element.ref;
+  if (ref != null) {
+    attachRef(ref, instance, element._owner);
+  }
+};
+
+ReactRef.shouldUpdateRefs = function(instance, prevElement, nextElement) {
+  // If either the owner or a `ref` has changed, make sure the newest owner
+  // has stored a reference to `this`, and the previous owner (if different)
+  // has forgotten the reference to `this`. We use the element instead
+  // of the public this.props because the post processing cannot determine
+  // a ref. The ref conceptually lives on the element.
+
+  // TODO: Should this even be possible? The owner cannot change because
+  // it's forbidden by shouldUpdateReactComponent. The ref can change
+  // if you swap the keys of but not the refs. Reconsider where this check
+  // is made. It probably belongs where the key checking and
+  // instantiateReactComponent is done.
+
+  return (
+    nextElement._owner !== prevElement._owner ||
+    nextElement.ref !== prevElement.ref
+  );
+};
+
+ReactRef.detachRefs = function(instance, element) {
+  var ref = element.ref;
+  if (ref != null) {
+    detachRef(ref, instance, element._owner);
+  }
+};
+
+module.exports = ReactRef;
+
+},{"./ReactOwner":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactOwner.js","./ReactUpdates":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactUpdates.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactRootIndex.js":[function(require,module,exports){
 /**
  * Copyright 2013-2014, Facebook, Inc.
  * All rights reserved.
@@ -13456,7 +14099,7 @@ module.exports = ReactReconcileTransaction;
  * @typechecks
  */
 
-"use strict";
+'use strict';
 
 var ReactRootIndexInjection = {
   /**
@@ -13487,7 +14130,7 @@ module.exports = ReactRootIndex;
  * @typechecks static-only
  * @providesModule ReactServerRendering
  */
-"use strict";
+'use strict';
 
 var ReactElement = require("./ReactElement");
 var ReactInstanceHandles = require("./ReactInstanceHandles");
@@ -13495,6 +14138,7 @@ var ReactMarkupChecksum = require("./ReactMarkupChecksum");
 var ReactServerRenderingTransaction =
   require("./ReactServerRenderingTransaction");
 
+var emptyObject = require("./emptyObject");
 var instantiateReactComponent = require("./instantiateReactComponent");
 var invariant = require("./invariant");
 
@@ -13515,7 +14159,8 @@ function renderToString(element) {
 
     return transaction.perform(function() {
       var componentInstance = instantiateReactComponent(element, null);
-      var markup = componentInstance.mountComponent(id, transaction, 0);
+      var markup =
+        componentInstance.mountComponent(id, transaction, emptyObject);
       return ReactMarkupChecksum.addChecksumToMarkup(markup);
     }, null);
   } finally {
@@ -13541,7 +14186,7 @@ function renderToStaticMarkup(element) {
 
     return transaction.perform(function() {
       var componentInstance = instantiateReactComponent(element, null);
-      return componentInstance.mountComponent(id, transaction, 0);
+      return componentInstance.mountComponent(id, transaction, emptyObject);
     }, null);
   } finally {
     ReactServerRenderingTransaction.release(transaction);
@@ -13554,7 +14199,7 @@ module.exports = {
 };
 
 }).call(this,require('_process'))
-},{"./ReactElement":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactElement.js","./ReactInstanceHandles":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactInstanceHandles.js","./ReactMarkupChecksum":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactMarkupChecksum.js","./ReactServerRenderingTransaction":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactServerRenderingTransaction.js","./instantiateReactComponent":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/instantiateReactComponent.js","./invariant":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/invariant.js","_process":"/Users/sahat/Projects/trip-planner/node_modules/browserify/node_modules/process/browser.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactServerRenderingTransaction.js":[function(require,module,exports){
+},{"./ReactElement":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactElement.js","./ReactInstanceHandles":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactInstanceHandles.js","./ReactMarkupChecksum":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactMarkupChecksum.js","./ReactServerRenderingTransaction":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactServerRenderingTransaction.js","./emptyObject":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/emptyObject.js","./instantiateReactComponent":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/instantiateReactComponent.js","./invariant":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/invariant.js","_process":"/Users/sahat/Projects/trip-planner/node_modules/browserify/node_modules/process/browser.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactServerRenderingTransaction.js":[function(require,module,exports){
 /**
  * Copyright 2014, Facebook, Inc.
  * All rights reserved.
@@ -13567,7 +14212,7 @@ module.exports = {
  * @typechecks
  */
 
-"use strict";
+'use strict';
 
 var PooledClass = require("./PooledClass");
 var CallbackQueue = require("./CallbackQueue");
@@ -13667,113 +14312,275 @@ PooledClass.addPoolingTo(ReactServerRenderingTransaction);
 
 module.exports = ReactServerRenderingTransaction;
 
-},{"./CallbackQueue":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/CallbackQueue.js","./Object.assign":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/Object.assign.js","./PooledClass":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/PooledClass.js","./ReactPutListenerQueue":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactPutListenerQueue.js","./Transaction":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/Transaction.js","./emptyFunction":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/emptyFunction.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactTextComponent.js":[function(require,module,exports){
+},{"./CallbackQueue":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/CallbackQueue.js","./Object.assign":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/Object.assign.js","./PooledClass":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/PooledClass.js","./ReactPutListenerQueue":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactPutListenerQueue.js","./Transaction":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/Transaction.js","./emptyFunction":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/emptyFunction.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactUpdateQueue.js":[function(require,module,exports){
+(function (process){
 /**
- * Copyright 2013-2014, Facebook, Inc.
+ * Copyright 2015, Facebook, Inc.
  * All rights reserved.
  *
  * This source code is licensed under the BSD-style license found in the
  * LICENSE file in the root directory of this source tree. An additional grant
  * of patent rights can be found in the PATENTS file in the same directory.
  *
- * @providesModule ReactTextComponent
- * @typechecks static-only
+ * @providesModule ReactUpdateQueue
  */
 
 "use strict";
 
-var DOMPropertyOperations = require("./DOMPropertyOperations");
-var ReactComponent = require("./ReactComponent");
+var ReactLifeCycle = require("./ReactLifeCycle");
+var ReactCurrentOwner = require("./ReactCurrentOwner");
 var ReactElement = require("./ReactElement");
+var ReactInstanceMap = require("./ReactInstanceMap");
+var ReactUpdates = require("./ReactUpdates");
 
 var assign = require("./Object.assign");
-var escapeTextForBrowser = require("./escapeTextForBrowser");
+var invariant = require("./invariant");
+
+function enqueueUpdate(internalInstance) {
+  if (internalInstance !== ReactLifeCycle.currentlyMountingInstance) {
+    // If we're in a componentWillMount handler, don't enqueue a rerender
+    // because ReactUpdates assumes we're in a browser context (which is
+    // wrong for server rendering) and we're about to do a render anyway.
+    // See bug in #1740.
+    ReactUpdates.enqueueUpdate(internalInstance);
+  }
+}
+
+function getInternalInstanceReadyForUpdate(publicInstance, callerName) {
+  ("production" !== process.env.NODE_ENV ? invariant(
+    ReactCurrentOwner.current == null,
+    '%s(...): Cannot update during an existing state transition ' +
+    '(such as within `render`). Render methods should be a pure function ' +
+    'of props and state.',
+    callerName
+  ) : invariant(ReactCurrentOwner.current == null));
+
+  var internalInstance = ReactInstanceMap.get(publicInstance);
+  ("production" !== process.env.NODE_ENV ? invariant(
+    internalInstance,
+    '%s(...): Can only update a mounted or mounting component. ' +
+    'This usually means you called %s() on an unmounted ' +
+    'component.',
+    callerName,
+    callerName
+  ) : invariant(internalInstance));
+  ("production" !== process.env.NODE_ENV ? invariant(
+    internalInstance !== ReactLifeCycle.currentlyUnmountingInstance,
+    '%s(...): Cannot call %s() on an unmounting component.',
+    callerName,
+    callerName
+  ) : invariant(internalInstance !== ReactLifeCycle.currentlyUnmountingInstance));
+  return internalInstance;
+}
 
 /**
- * Text nodes violate a couple assumptions that React makes about components:
- *
- *  - When mounting text into the DOM, adjacent text nodes are merged.
- *  - Text nodes cannot be assigned a React root ID.
- *
- * This component is used to wrap strings in elements so that they can undergo
- * the same reconciliation that is applied to elements.
- *
- * TODO: Investigate representing React components in the DOM with text nodes.
- *
- * @class ReactTextComponent
- * @extends ReactComponent
- * @internal
+ * ReactUpdateQueue allows for state updates to be scheduled into a later
+ * reconciliation step.
  */
-var ReactTextComponent = function(props) {
-  // This constructor and it's argument is currently used by mocks.
-};
-
-assign(ReactTextComponent.prototype, ReactComponent.Mixin, {
+var ReactUpdateQueue = {
 
   /**
-   * Creates the markup for this text node. This node is not intended to have
-   * any features besides containing text content.
+   * Enqueue a callback that will be executed after all the pending updates
+   * have processed.
    *
-   * @param {string} rootID DOM ID of the root node.
-   * @param {ReactReconcileTransaction|ReactServerRenderingTransaction} transaction
-   * @param {number} mountDepth number of components in the owner hierarchy
-   * @return {string} Markup for this text node.
+   * @param {ReactClass} publicInstance The instance to use as `this` context.
+   * @param {?function} callback Called after state is updated.
    * @internal
    */
-  mountComponent: function(rootID, transaction, mountDepth) {
-    ReactComponent.Mixin.mountComponent.call(
-      this,
-      rootID,
-      transaction,
-      mountDepth
-    );
-
-    var escapedText = escapeTextForBrowser(this.props);
-
-    if (transaction.renderToStaticMarkup) {
-      // Normally we'd wrap this in a `span` for the reasons stated above, but
-      // since this is a situation where React won't take over (static pages),
-      // we can simply return the text as it is.
-      return escapedText;
+  enqueueCallback: function(publicInstance, callback) {
+    ("production" !== process.env.NODE_ENV ? invariant(
+      typeof callback === 'function',
+      'enqueueCallback(...): You called `setProps`, `replaceProps`, ' +
+      '`setState`, `replaceState`, or `forceUpdate` with a callback that ' +
+      'isn\'t callable.'
+    ) : invariant(typeof callback === 'function'));
+    var internalInstance = ReactInstanceMap.get(publicInstance);
+    ("production" !== process.env.NODE_ENV ? invariant(
+      internalInstance,
+      'Cannot enqueue a callback on an instance that is unmounted.'
+    ) : invariant(internalInstance));
+    if (internalInstance === ReactLifeCycle.currentlyMountingInstance) {
+      // Ignore callbacks in componentWillMount. See enqueueUpdate.
+      return;
     }
+    if (internalInstance._pendingCallbacks) {
+      internalInstance._pendingCallbacks.push(callback);
+    } else {
+      internalInstance._pendingCallbacks = [callback];
+    }
+    // TODO: The callback here is ignored when setState is called from
+    // componentWillMount. Either fix it or disallow doing so completely in
+    // favor of getInitialState. Alternatively, we can disallow
+    // componentWillMount during server-side rendering.
+    enqueueUpdate(internalInstance);
+  },
 
-    return (
-      '<span ' + DOMPropertyOperations.createMarkupForID(rootID) + '>' +
-        escapedText +
-      '</span>'
-    );
+  enqueueCallbackInternal: function(internalInstance, callback) {
+    ("production" !== process.env.NODE_ENV ? invariant(
+      typeof callback === "function",
+      'enqueueCallback(...): You called `setProps`, `replaceProps`, ' +
+      '`setState`, `replaceState`, or `forceUpdate` with a callback that ' +
+      'isn\'t callable.'
+    ) : invariant(typeof callback === "function"));
+    if (internalInstance._pendingCallbacks) {
+      internalInstance._pendingCallbacks.push(callback);
+    } else {
+      internalInstance._pendingCallbacks = [callback];
+    }
   },
 
   /**
-   * Updates this component by updating the text content.
+   * Forces an update. This should only be invoked when it is known with
+   * certainty that we are **not** in a DOM transaction.
    *
-   * @param {object} nextComponent Contains the next text content.
-   * @param {ReactReconcileTransaction} transaction
+   * You may want to call this when you know that some deeper aspect of the
+   * component's state has changed but `setState` was not called.
+   *
+   * This will not invoke `shouldUpdateComponent`, but it will invoke
+   * `componentWillUpdate` and `componentDidUpdate`.
+   *
+   * @param {ReactClass} publicInstance The instance that should rerender.
    * @internal
    */
-  receiveComponent: function(nextComponent, transaction) {
-    var nextProps = nextComponent.props;
-    if (nextProps !== this.props) {
-      this.props = nextProps;
-      ReactComponent.BackendIDOperations.updateTextContentByID(
-        this._rootNodeID,
-        nextProps
-      );
-    }
+  enqueueForceUpdate: function(publicInstance) {
+    var internalInstance = getInternalInstanceReadyForUpdate(
+      publicInstance,
+      'forceUpdate'
+    );
+
+    internalInstance._pendingForceUpdate = true;
+
+    enqueueUpdate(internalInstance);
+  },
+
+  /**
+   * Replaces all of the state. Always use this or `setState` to mutate state.
+   * You should treat `this.state` as immutable.
+   *
+   * There is no guarantee that `this.state` will be immediately updated, so
+   * accessing `this.state` after calling this method may return the old value.
+   *
+   * @param {ReactClass} publicInstance The instance that should rerender.
+   * @param {object} completeState Next state.
+   * @internal
+   */
+  enqueueReplaceState: function(publicInstance, completeState) {
+    var internalInstance = getInternalInstanceReadyForUpdate(
+      publicInstance,
+      'replaceState'
+    );
+
+    internalInstance._pendingState = completeState;
+
+    enqueueUpdate(internalInstance);
+  },
+
+  /**
+   * Sets a subset of the state. This only exists because _pendingState is
+   * internal. This provides a merging strategy that is not available to deep
+   * properties which is confusing. TODO: Expose pendingState or don't use it
+   * during the merge.
+   *
+   * @param {ReactClass} publicInstance The instance that should rerender.
+   * @param {object} partialState Next partial state to be merged with state.
+   * @internal
+   */
+  enqueueSetState: function(publicInstance, partialState) {
+    var internalInstance = getInternalInstanceReadyForUpdate(
+      publicInstance,
+      'setState'
+    );
+
+    // Merge with `_pendingState` if it exists, otherwise with existing state.
+    internalInstance._pendingState = assign(
+      {},
+      internalInstance._pendingState || internalInstance._instance.state,
+      partialState
+    );
+
+    enqueueUpdate(internalInstance);
+  },
+
+  /**
+   * Sets a subset of the props.
+   *
+   * @param {ReactClass} publicInstance The instance that should rerender.
+   * @param {object} partialProps Subset of the next props.
+   * @internal
+   */
+  enqueueSetProps: function(publicInstance, partialProps) {
+    var internalInstance = getInternalInstanceReadyForUpdate(
+      publicInstance,
+      'setProps'
+    );
+
+    ("production" !== process.env.NODE_ENV ? invariant(
+      internalInstance._isTopLevel,
+      'setProps(...): You called `setProps` on a ' +
+      'component with a parent. This is an anti-pattern since props will ' +
+      'get reactively updated when rendered. Instead, change the owner\'s ' +
+      '`render` method to pass the correct value as props to the component ' +
+      'where it is created.'
+    ) : invariant(internalInstance._isTopLevel));
+
+    // Merge with the pending element if it exists, otherwise with existing
+    // element props.
+    var element = internalInstance._pendingElement ||
+                  internalInstance._currentElement;
+    var props = assign({}, element.props, partialProps);
+    internalInstance._pendingElement = ReactElement.cloneAndReplaceProps(
+      element,
+      props
+    );
+
+    enqueueUpdate(internalInstance);
+  },
+
+  /**
+   * Replaces all of the props.
+   *
+   * @param {ReactClass} publicInstance The instance that should rerender.
+   * @param {object} props New props.
+   * @internal
+   */
+  enqueueReplaceProps: function(publicInstance, props) {
+    var internalInstance = getInternalInstanceReadyForUpdate(
+      publicInstance,
+      'replaceProps'
+    );
+
+    ("production" !== process.env.NODE_ENV ? invariant(
+      internalInstance._isTopLevel,
+      'replaceProps(...): You called `replaceProps` on a ' +
+      'component with a parent. This is an anti-pattern since props will ' +
+      'get reactively updated when rendered. Instead, change the owner\'s ' +
+      '`render` method to pass the correct value as props to the component ' +
+      'where it is created.'
+    ) : invariant(internalInstance._isTopLevel));
+
+    // Merge with the pending element if it exists, otherwise with existing
+    // element props.
+    var element = internalInstance._pendingElement ||
+                  internalInstance._currentElement;
+    internalInstance._pendingElement = ReactElement.cloneAndReplaceProps(
+      element,
+      props
+    );
+
+    enqueueUpdate(internalInstance);
+  },
+
+  enqueueElementInternal: function(internalInstance, newElement) {
+    internalInstance._pendingElement = newElement;
+    enqueueUpdate(internalInstance);
   }
 
-});
-
-var ReactTextComponentFactory = function(text) {
-  // Bypass validation and configuration
-  return new ReactElement(ReactTextComponent, null, null, null, null, text);
 };
 
-ReactTextComponentFactory.type = ReactTextComponent;
+module.exports = ReactUpdateQueue;
 
-module.exports = ReactTextComponentFactory;
-
-},{"./DOMPropertyOperations":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/DOMPropertyOperations.js","./Object.assign":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/Object.assign.js","./ReactComponent":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactComponent.js","./ReactElement":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactElement.js","./escapeTextForBrowser":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/escapeTextForBrowser.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactUpdates.js":[function(require,module,exports){
+}).call(this,require('_process'))
+},{"./Object.assign":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/Object.assign.js","./ReactCurrentOwner":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactCurrentOwner.js","./ReactElement":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactElement.js","./ReactInstanceMap":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactInstanceMap.js","./ReactLifeCycle":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactLifeCycle.js","./ReactUpdates":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactUpdates.js","./invariant":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/invariant.js","_process":"/Users/sahat/Projects/trip-planner/node_modules/browserify/node_modules/process/browser.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactUpdates.js":[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2014, Facebook, Inc.
@@ -13786,7 +14593,7 @@ module.exports = ReactTextComponentFactory;
  * @providesModule ReactUpdates
  */
 
-"use strict";
+'use strict';
 
 var CallbackQueue = require("./CallbackQueue");
 var PooledClass = require("./PooledClass");
@@ -13881,20 +14688,20 @@ assign(
 
 PooledClass.addPoolingTo(ReactUpdatesFlushTransaction);
 
-function batchedUpdates(callback, a, b) {
+function batchedUpdates(callback, a, b, c, d) {
   ensureInjected();
-  batchingStrategy.batchedUpdates(callback, a, b);
+  batchingStrategy.batchedUpdates(callback, a, b, c, d);
 }
 
 /**
- * Array comparator for ReactComponents by owner depth
+ * Array comparator for ReactComponents by mount ordering.
  *
  * @param {ReactComponent} c1 first component you're comparing
  * @param {ReactComponent} c2 second component you're comparing
  * @return {number} Return value usable by Array.prototype.sort().
  */
-function mountDepthComparator(c1, c2) {
-  return c1._mountDepth - c2._mountDepth;
+function mountOrderComparator(c1, c2) {
+  return c1._mountOrder - c2._mountOrder;
 }
 
 function runBatchedUpdates(transaction) {
@@ -13910,69 +14717,64 @@ function runBatchedUpdates(transaction) {
   // Since reconciling a component higher in the owner hierarchy usually (not
   // always -- see shouldComponentUpdate()) will reconcile children, reconcile
   // them before their children by sorting the array.
-  dirtyComponents.sort(mountDepthComparator);
+  dirtyComponents.sort(mountOrderComparator);
 
   for (var i = 0; i < len; i++) {
-    // If a component is unmounted before pending changes apply, ignore them
-    // TODO: Queue unmounts in the same list to avoid this happening at all
+    // If a component is unmounted before pending changes apply, it will still
+    // be here, but we assume that it has cleared its _pendingCallbacks and
+    // that performUpdateIfNecessary is a noop.
     var component = dirtyComponents[i];
-    if (component.isMounted()) {
-      // If performUpdateIfNecessary happens to enqueue any new updates, we
-      // shouldn't execute the callbacks until the next render happens, so
-      // stash the callbacks first
-      var callbacks = component._pendingCallbacks;
-      component._pendingCallbacks = null;
-      component.performUpdateIfNecessary(transaction.reconcileTransaction);
 
-      if (callbacks) {
-        for (var j = 0; j < callbacks.length; j++) {
-          transaction.callbackQueue.enqueue(
-            callbacks[j],
-            component
-          );
-        }
+    // If performUpdateIfNecessary happens to enqueue any new updates, we
+    // shouldn't execute the callbacks until the next render happens, so
+    // stash the callbacks first
+    var callbacks = component._pendingCallbacks;
+    component._pendingCallbacks = null;
+    component.performUpdateIfNecessary(transaction.reconcileTransaction);
+
+    if (callbacks) {
+      for (var j = 0; j < callbacks.length; j++) {
+        transaction.callbackQueue.enqueue(
+          callbacks[j],
+          component.getPublicInstance()
+        );
       }
     }
   }
 }
 
-var flushBatchedUpdates = ReactPerf.measure(
-  'ReactUpdates',
-  'flushBatchedUpdates',
-  function() {
-    // ReactUpdatesFlushTransaction's wrappers will clear the dirtyComponents
-    // array and perform any updates enqueued by mount-ready handlers (i.e.,
-    // componentDidUpdate) but we need to check here too in order to catch
-    // updates enqueued by setState callbacks and asap calls.
-    while (dirtyComponents.length || asapEnqueued) {
-      if (dirtyComponents.length) {
-        var transaction = ReactUpdatesFlushTransaction.getPooled();
-        transaction.perform(runBatchedUpdates, null, transaction);
-        ReactUpdatesFlushTransaction.release(transaction);
-      }
+var flushBatchedUpdates = function() {
+  // ReactUpdatesFlushTransaction's wrappers will clear the dirtyComponents
+  // array and perform any updates enqueued by mount-ready handlers (i.e.,
+  // componentDidUpdate) but we need to check here too in order to catch
+  // updates enqueued by setState callbacks and asap calls.
+  while (dirtyComponents.length || asapEnqueued) {
+    if (dirtyComponents.length) {
+      var transaction = ReactUpdatesFlushTransaction.getPooled();
+      transaction.perform(runBatchedUpdates, null, transaction);
+      ReactUpdatesFlushTransaction.release(transaction);
+    }
 
-      if (asapEnqueued) {
-        asapEnqueued = false;
-        var queue = asapCallbackQueue;
-        asapCallbackQueue = CallbackQueue.getPooled();
-        queue.notifyAll();
-        CallbackQueue.release(queue);
-      }
+    if (asapEnqueued) {
+      asapEnqueued = false;
+      var queue = asapCallbackQueue;
+      asapCallbackQueue = CallbackQueue.getPooled();
+      queue.notifyAll();
+      CallbackQueue.release(queue);
     }
   }
+};
+flushBatchedUpdates = ReactPerf.measure(
+  'ReactUpdates',
+  'flushBatchedUpdates',
+  flushBatchedUpdates
 );
 
 /**
  * Mark a component as needing a rerender, adding an optional callback to a
  * list of functions which will be executed once the rerender occurs.
  */
-function enqueueUpdate(component, callback) {
-  ("production" !== process.env.NODE_ENV ? invariant(
-    !callback || typeof callback === "function",
-    'enqueueUpdate(...): You called `setProps`, `replaceProps`, ' +
-    '`setState`, `replaceState`, or `forceUpdate` with a callback that ' +
-    'isn\'t callable.'
-  ) : invariant(!callback || typeof callback === "function"));
+function enqueueUpdate(component) {
   ensureInjected();
 
   // Various parts of our code (such as ReactCompositeComponent's
@@ -13989,19 +14791,11 @@ function enqueueUpdate(component, callback) {
   ) : null);
 
   if (!batchingStrategy.isBatchingUpdates) {
-    batchingStrategy.batchedUpdates(enqueueUpdate, component, callback);
+    batchingStrategy.batchedUpdates(enqueueUpdate, component);
     return;
   }
 
   dirtyComponents.push(component);
-
-  if (callback) {
-    if (component._pendingCallbacks) {
-      component._pendingCallbacks.push(callback);
-    } else {
-      component._pendingCallbacks = [callback];
-    }
-  }
 }
 
 /**
@@ -14077,7 +14871,7 @@ module.exports = ReactUpdates;
 
 /*jslint bitwise: true*/
 
-"use strict";
+'use strict';
 
 var DOMProperty = require("./DOMProperty");
 
@@ -14167,7 +14961,7 @@ module.exports = SVGDOMPropertyConfig;
  * @providesModule SelectEventPlugin
  */
 
-"use strict";
+'use strict';
 
 var EventConstants = require("./EventConstants");
 var EventPropagators = require("./EventPropagators");
@@ -14252,8 +15046,8 @@ function constructSelectEvent(nativeEvent) {
   // won't dispatch.
   if (mouseDown ||
       activeElement == null ||
-      activeElement != getActiveElement()) {
-    return;
+      activeElement !== getActiveElement()) {
+    return null;
   }
 
   // Only fire when selection has actually changed.
@@ -14363,7 +15157,7 @@ module.exports = SelectEventPlugin;
  * @typechecks
  */
 
-"use strict";
+'use strict';
 
 /**
  * Size of the reactRoot ID space. We generate random numbers for React root
@@ -14394,7 +15188,7 @@ module.exports = ServerReactRootIndex;
  * @providesModule SimpleEventPlugin
  */
 
-"use strict";
+'use strict';
 
 var EventConstants = require("./EventConstants");
 var EventPluginUtils = require("./EventPluginUtils");
@@ -14822,7 +15616,7 @@ module.exports = SimpleEventPlugin;
  * @typechecks static-only
  */
 
-"use strict";
+'use strict';
 
 var SyntheticEvent = require("./SyntheticEvent");
 
@@ -14854,7 +15648,6 @@ SyntheticEvent.augmentClass(SyntheticClipboardEvent, ClipboardEventInterface);
 
 module.exports = SyntheticClipboardEvent;
 
-
 },{"./SyntheticEvent":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/SyntheticEvent.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/SyntheticCompositionEvent.js":[function(require,module,exports){
 /**
  * Copyright 2013-2014, Facebook, Inc.
@@ -14868,7 +15661,7 @@ module.exports = SyntheticClipboardEvent;
  * @typechecks static-only
  */
 
-"use strict";
+'use strict';
 
 var SyntheticEvent = require("./SyntheticEvent");
 
@@ -14900,7 +15693,6 @@ SyntheticEvent.augmentClass(
 
 module.exports = SyntheticCompositionEvent;
 
-
 },{"./SyntheticEvent":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/SyntheticEvent.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/SyntheticDragEvent.js":[function(require,module,exports){
 /**
  * Copyright 2013-2014, Facebook, Inc.
@@ -14914,7 +15706,7 @@ module.exports = SyntheticCompositionEvent;
  * @typechecks static-only
  */
 
-"use strict";
+'use strict';
 
 var SyntheticMouseEvent = require("./SyntheticMouseEvent");
 
@@ -14953,7 +15745,7 @@ module.exports = SyntheticDragEvent;
  * @typechecks static-only
  */
 
-"use strict";
+'use strict';
 
 var PooledClass = require("./PooledClass");
 
@@ -15031,13 +15823,21 @@ assign(SyntheticEvent.prototype, {
   preventDefault: function() {
     this.defaultPrevented = true;
     var event = this.nativeEvent;
-    event.preventDefault ? event.preventDefault() : event.returnValue = false;
+    if (event.preventDefault) {
+      event.preventDefault();
+    } else {
+      event.returnValue = false;
+    }
     this.isDefaultPrevented = emptyFunction.thatReturnsTrue;
   },
 
   stopPropagation: function() {
     var event = this.nativeEvent;
-    event.stopPropagation ? event.stopPropagation() : event.cancelBubble = true;
+    if (event.stopPropagation) {
+      event.stopPropagation();
+    } else {
+      event.cancelBubble = true;
+    }
     this.isPropagationStopped = emptyFunction.thatReturnsTrue;
   },
 
@@ -15111,7 +15911,7 @@ module.exports = SyntheticEvent;
  * @typechecks static-only
  */
 
-"use strict";
+'use strict';
 
 var SyntheticUIEvent = require("./SyntheticUIEvent");
 
@@ -15150,7 +15950,7 @@ module.exports = SyntheticFocusEvent;
  * @typechecks static-only
  */
 
-"use strict";
+'use strict';
 
 var SyntheticEvent = require("./SyntheticEvent");
 
@@ -15183,7 +15983,6 @@ SyntheticEvent.augmentClass(
 
 module.exports = SyntheticInputEvent;
 
-
 },{"./SyntheticEvent":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/SyntheticEvent.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/SyntheticKeyboardEvent.js":[function(require,module,exports){
 /**
  * Copyright 2013-2014, Facebook, Inc.
@@ -15197,7 +15996,7 @@ module.exports = SyntheticInputEvent;
  * @typechecks static-only
  */
 
-"use strict";
+'use strict';
 
 var SyntheticUIEvent = require("./SyntheticUIEvent");
 
@@ -15284,7 +16083,7 @@ module.exports = SyntheticKeyboardEvent;
  * @typechecks static-only
  */
 
-"use strict";
+'use strict';
 
 var SyntheticUIEvent = require("./SyntheticUIEvent");
 var ViewportMetrics = require("./ViewportMetrics");
@@ -15322,9 +16121,7 @@ var MouseEventInterface = {
   buttons: null,
   relatedTarget: function(event) {
     return event.relatedTarget || (
-      event.fromElement === event.srcElement ?
-        event.toElement :
-        event.fromElement
+      ((event.fromElement === event.srcElement ? event.toElement : event.fromElement))
     );
   },
   // "Proprietary" Interface.
@@ -15367,7 +16164,7 @@ module.exports = SyntheticMouseEvent;
  * @typechecks static-only
  */
 
-"use strict";
+'use strict';
 
 var SyntheticUIEvent = require("./SyntheticUIEvent");
 
@@ -15415,7 +16212,7 @@ module.exports = SyntheticTouchEvent;
  * @typechecks static-only
  */
 
-"use strict";
+'use strict';
 
 var SyntheticEvent = require("./SyntheticEvent");
 
@@ -15477,7 +16274,7 @@ module.exports = SyntheticUIEvent;
  * @typechecks static-only
  */
 
-"use strict";
+'use strict';
 
 var SyntheticMouseEvent = require("./SyntheticMouseEvent");
 
@@ -15538,7 +16335,7 @@ module.exports = SyntheticWheelEvent;
  * @providesModule Transaction
  */
 
-"use strict";
+'use strict';
 
 var invariant = require("./invariant");
 
@@ -15732,8 +16529,8 @@ var Mixin = {
         // close -- if it's still set to true in the finally block, it means
         // wrapper.close threw.
         errorThrown = true;
-        if (initData !== Transaction.OBSERVED_ERROR) {
-          wrapper.close && wrapper.close.call(this, initData);
+        if (initData !== Transaction.OBSERVED_ERROR && wrapper.close) {
+          wrapper.close.call(this, initData);
         }
         errorThrown = false;
       } finally {
@@ -15778,9 +16575,7 @@ module.exports = Transaction;
  * @providesModule ViewportMetrics
  */
 
-"use strict";
-
-var getUnboundedScrollPosition = require("./getUnboundedScrollPosition");
+'use strict';
 
 var ViewportMetrics = {
 
@@ -15788,8 +16583,7 @@ var ViewportMetrics = {
 
   currentScrollTop: 0,
 
-  refreshScrollValues: function() {
-    var scrollPosition = getUnboundedScrollPosition(window);
+  refreshScrollValues: function(scrollPosition) {
     ViewportMetrics.currentScrollLeft = scrollPosition.x;
     ViewportMetrics.currentScrollTop = scrollPosition.y;
   }
@@ -15798,7 +16592,7 @@ var ViewportMetrics = {
 
 module.exports = ViewportMetrics;
 
-},{"./getUnboundedScrollPosition":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/getUnboundedScrollPosition.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/accumulateInto.js":[function(require,module,exports){
+},{}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/accumulateInto.js":[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2014, Facebook, Inc.
@@ -15811,7 +16605,7 @@ module.exports = ViewportMetrics;
  * @providesModule accumulateInto
  */
 
-"use strict";
+'use strict';
 
 var invariant = require("./invariant");
 
@@ -15878,7 +16672,7 @@ module.exports = accumulateInto;
 
 /* jslint bitwise:true */
 
-"use strict";
+'use strict';
 
 var MOD = 65521;
 
@@ -16116,10 +16910,10 @@ module.exports = createArrayFrom;
  * @typechecks
  */
 
-"use strict";
+'use strict';
 
 // Defeat circular references by requiring this directly.
-var ReactCompositeComponent = require("./ReactCompositeComponent");
+var ReactClass = require("./ReactClass");
 var ReactElement = require("./ReactElement");
 
 var invariant = require("./invariant");
@@ -16138,7 +16932,7 @@ var invariant = require("./invariant");
 function createFullPageComponent(tag) {
   var elementFactory = ReactElement.createFactory(tag);
 
-  var FullPageComponent = ReactCompositeComponent.createClass({
+  var FullPageComponent = ReactClass.createClass({
     displayName: 'ReactFullPageComponent' + tag,
 
     componentWillUnmount: function() {
@@ -16163,7 +16957,7 @@ function createFullPageComponent(tag) {
 module.exports = createFullPageComponent;
 
 }).call(this,require('_process'))
-},{"./ReactCompositeComponent":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactCompositeComponent.js","./ReactElement":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactElement.js","./invariant":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/invariant.js","_process":"/Users/sahat/Projects/trip-planner/node_modules/browserify/node_modules/process/browser.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/createNodesFromMarkup.js":[function(require,module,exports){
+},{"./ReactClass":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactClass.js","./ReactElement":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactElement.js","./invariant":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/invariant.js","_process":"/Users/sahat/Projects/trip-planner/node_modules/browserify/node_modules/process/browser.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/createNodesFromMarkup.js":[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2014, Facebook, Inc.
@@ -16266,7 +17060,7 @@ module.exports = createNodesFromMarkup;
  * @typechecks static-only
  */
 
-"use strict";
+'use strict';
 
 var CSSProperty = require("./CSSProperty");
 
@@ -16311,58 +17105,7 @@ function dangerousStyleValue(name, value) {
 
 module.exports = dangerousStyleValue;
 
-},{"./CSSProperty":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/CSSProperty.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/deprecated.js":[function(require,module,exports){
-(function (process){
-/**
- * Copyright 2013-2014, Facebook, Inc.
- * All rights reserved.
- *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
- *
- * @providesModule deprecated
- */
-
-var assign = require("./Object.assign");
-var warning = require("./warning");
-
-/**
- * This will log a single deprecation notice per function and forward the call
- * on to the new API.
- *
- * @param {string} namespace The namespace of the call, eg 'React'
- * @param {string} oldName The old function name, eg 'renderComponent'
- * @param {string} newName The new function name, eg 'render'
- * @param {*} ctx The context this forwarded call should run in
- * @param {function} fn The function to forward on to
- * @return {*} Will be the value as returned from `fn`
- */
-function deprecated(namespace, oldName, newName, ctx, fn) {
-  var warned = false;
-  if ("production" !== process.env.NODE_ENV) {
-    var newFn = function() {
-      ("production" !== process.env.NODE_ENV ? warning(
-        warned,
-        (namespace + "." + oldName + " will be deprecated in a future version. ") +
-        ("Use " + namespace + "." + newName + " instead.")
-      ) : null);
-      warned = true;
-      return fn.apply(ctx, arguments);
-    };
-    newFn.displayName = (namespace + "_" + oldName);
-    // We need to make sure all properties of the original fn are copied over.
-    // In particular, this is needed to support PropTypes
-    return assign(newFn, fn);
-  }
-
-  return fn;
-}
-
-module.exports = deprecated;
-
-}).call(this,require('_process'))
-},{"./Object.assign":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/Object.assign.js","./warning":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/warning.js","_process":"/Users/sahat/Projects/trip-planner/node_modules/browserify/node_modules/process/browser.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/emptyFunction.js":[function(require,module,exports){
+},{"./CSSProperty":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/CSSProperty.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/emptyFunction.js":[function(require,module,exports){
 /**
  * Copyright 2013-2014, Facebook, Inc.
  * All rights reserved.
@@ -16433,14 +17176,14 @@ module.exports = emptyObject;
  * @typechecks static-only
  */
 
-"use strict";
+'use strict';
 
 var ESCAPE_LOOKUP = {
-  "&": "&amp;",
-  ">": "&gt;",
-  "<": "&lt;",
-  "\"": "&quot;",
-  "'": "&#x27;"
+  '&': '&amp;',
+  '>': '&gt;',
+  '<': '&lt;',
+  '"': '&quot;',
+  '\'': '&#x27;'
 };
 
 var ESCAPE_REGEX = /[&><"']/g;
@@ -16461,7 +17204,62 @@ function escapeTextForBrowser(text) {
 
 module.exports = escapeTextForBrowser;
 
-},{}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/flattenChildren.js":[function(require,module,exports){
+},{}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/findDOMNode.js":[function(require,module,exports){
+(function (process){
+/**
+ * Copyright 2013-2014, Facebook, Inc.
+ * All rights reserved.
+ *
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
+ *
+ * @providesModule findDOMNode
+ * @typechecks static-only
+ */
+
+'use strict';
+var ReactInstanceMap = require("./ReactInstanceMap");
+var ReactMount = require("./ReactMount");
+
+var invariant = require("./invariant");
+var isNode = require("./isNode");
+
+/**
+ * Returns the DOM node rendered by this element.
+ *
+ * @param {ReactComponent|DOMElement} componentOrElement
+ * @return {DOMElement} The root node of this element.
+ */
+function findDOMNode(componentOrElement) {
+  if (componentOrElement == null) {
+    return null;
+  }
+  if (isNode(componentOrElement)) {
+    return componentOrElement;
+  }
+  if (ReactInstanceMap.has(componentOrElement)) {
+    return ReactMount.getNodeFromInstance(componentOrElement);
+  }
+  ("production" !== process.env.NODE_ENV ? invariant(
+    componentOrElement.render == null ||
+    typeof componentOrElement.render !== 'function',
+    'Component (with keys: %s) contains `render` method ' +
+    'but is not mounted in the DOM',
+    Object.keys(componentOrElement)
+  ) : invariant(componentOrElement.render == null ||
+  typeof componentOrElement.render !== 'function'));
+  ("production" !== process.env.NODE_ENV ? invariant(
+    false,
+    'Element appears to be neither ReactComponent nor DOMNode (keys: %s)',
+    Object.keys(componentOrElement)
+  ) : invariant(false));
+}
+
+module.exports = findDOMNode;
+
+}).call(this,require('_process'))
+},{"./ReactInstanceMap":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactInstanceMap.js","./ReactMount":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactMount.js","./invariant":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/invariant.js","./isNode":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/isNode.js","_process":"/Users/sahat/Projects/trip-planner/node_modules/browserify/node_modules/process/browser.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/flattenChildren.js":[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2014, Facebook, Inc.
@@ -16474,9 +17272,7 @@ module.exports = escapeTextForBrowser;
  * @providesModule flattenChildren
  */
 
-"use strict";
-
-var ReactTextComponent = require("./ReactTextComponent");
+'use strict';
 
 var traverseAllChildren = require("./traverseAllChildren");
 var warning = require("./warning");
@@ -16490,26 +17286,17 @@ function flattenSingleChildIntoContext(traverseContext, child, name) {
   // We found a component instance.
   var result = traverseContext;
   var keyUnique = !result.hasOwnProperty(name);
-  ("production" !== process.env.NODE_ENV ? warning(
-    keyUnique,
-    'flattenChildren(...): Encountered two children with the same key, ' +
-    '`%s`. Child keys must be unique; when two children share a key, only ' +
-    'the first child will be used.',
-    name
-  ) : null);
+  if ("production" !== process.env.NODE_ENV) {
+    ("production" !== process.env.NODE_ENV ? warning(
+      keyUnique,
+      'flattenChildren(...): Encountered two children with the same key, ' +
+      '`%s`. Child keys must be unique; when two children share a key, only ' +
+      'the first child will be used.',
+      name
+    ) : null);
+  }
   if (keyUnique && child != null) {
-    var type = typeof child;
-    var normalizedValue;
-
-    if (type === 'string') {
-      normalizedValue = ReactTextComponent(child);
-    } else if (type === 'number') {
-      normalizedValue = ReactTextComponent('' + child);
-    } else {
-      normalizedValue = child;
-    }
-
-    result[name] = normalizedValue;
+    result[name] = child;
   }
 }
 
@@ -16530,7 +17317,7 @@ function flattenChildren(children) {
 module.exports = flattenChildren;
 
 }).call(this,require('_process'))
-},{"./ReactTextComponent":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactTextComponent.js","./traverseAllChildren":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/traverseAllChildren.js","./warning":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/warning.js","_process":"/Users/sahat/Projects/trip-planner/node_modules/browserify/node_modules/process/browser.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/focusNode.js":[function(require,module,exports){
+},{"./traverseAllChildren":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/traverseAllChildren.js","./warning":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/warning.js","_process":"/Users/sahat/Projects/trip-planner/node_modules/browserify/node_modules/process/browser.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/focusNode.js":[function(require,module,exports){
 /**
  * Copyright 2014, Facebook, Inc.
  * All rights reserved.
@@ -16571,7 +17358,7 @@ module.exports = focusNode;
  * @providesModule forEachAccumulated
  */
 
-"use strict";
+'use strict';
 
 /**
  * @param {array} an "accumulation" of items which is either an Array or
@@ -16632,7 +17419,7 @@ module.exports = getActiveElement;
  * @typechecks static-only
  */
 
-"use strict";
+'use strict';
 
 /**
  * `charCode` represents the actual "character code" and is safe to use with
@@ -16684,7 +17471,7 @@ module.exports = getEventCharCode;
  * @typechecks static-only
  */
 
-"use strict";
+'use strict';
 
 var getEventCharCode = require("./getEventCharCode");
 
@@ -16789,7 +17576,7 @@ module.exports = getEventKey;
  * @typechecks static-only
  */
 
-"use strict";
+'use strict';
 
 /**
  * Translation from modifier key to the associated property in the event.
@@ -16836,7 +17623,7 @@ module.exports = getEventModifierState;
  * @typechecks static-only
  */
 
-"use strict";
+'use strict';
 
 /**
  * Gets the target node from a native browser event by accounting for
@@ -16853,6 +17640,50 @@ function getEventTarget(nativeEvent) {
 }
 
 module.exports = getEventTarget;
+
+},{}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/getIteratorFn.js":[function(require,module,exports){
+/**
+ * Copyright 2013-2014, Facebook, Inc.
+ * All rights reserved.
+ *
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
+ *
+ * @providesModule getIteratorFn
+ * @typechecks static-only
+ */
+
+'use strict';
+
+/* global Symbol */
+var ITERATOR_SYMBOL = typeof Symbol === 'function' && Symbol.iterator;
+var FAUX_ITERATOR_SYMBOL = '@@iterator'; // Before Symbol spec.
+
+/**
+ * Returns the iterator method function contained on the iterable object.
+ *
+ * Be sure to invoke the function with the iterable as context:
+ *
+ *     var iteratorFn = getIteratorFn(myIterable);
+ *     if (iteratorFn) {
+ *       var iterator = iteratorFn.call(myIterable);
+ *       ...
+ *     }
+ *
+ * @param {?object} maybeIterable
+ * @return {?function}
+ */
+function getIteratorFn(maybeIterable) {
+  var iteratorFn = maybeIterable && (
+    (ITERATOR_SYMBOL && maybeIterable[ITERATOR_SYMBOL] || maybeIterable[FAUX_ITERATOR_SYMBOL])
+  );
+  if (typeof iteratorFn === 'function') {
+    return iteratorFn;
+  }
+}
+
+module.exports = getIteratorFn;
 
 },{}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/getMarkupWrap.js":[function(require,module,exports){
 (function (process){
@@ -16983,7 +17814,7 @@ module.exports = getMarkupWrap;
  * @providesModule getNodeForCharacterOffset
  */
 
-"use strict";
+'use strict';
 
 /**
  * Given any node return the first leaf node without children.
@@ -17027,7 +17858,7 @@ function getNodeForCharacterOffset(root, offset) {
   var nodeEnd = 0;
 
   while (node) {
-    if (node.nodeType == 3) {
+    if (node.nodeType === 3) {
       nodeEnd = nodeStart + node.textContent.length;
 
       if (nodeStart <= offset && nodeEnd >= offset) {
@@ -17058,7 +17889,7 @@ module.exports = getNodeForCharacterOffset;
  * @providesModule getReactRootElementInContainer
  */
 
-"use strict";
+'use strict';
 
 var DOC_NODE_TYPE = 9;
 
@@ -17093,7 +17924,7 @@ module.exports = getReactRootElementInContainer;
  * @providesModule getTextContentAccessor
  */
 
-"use strict";
+'use strict';
 
 var ExecutionEnvironment = require("./ExecutionEnvironment");
 
@@ -17246,99 +18077,117 @@ module.exports = hyphenateStyleName;
  * @typechecks static-only
  */
 
-"use strict";
+'use strict';
 
+var ReactCompositeComponent = require("./ReactCompositeComponent");
+var ReactEmptyComponent = require("./ReactEmptyComponent");
+var ReactNativeComponent = require("./ReactNativeComponent");
+
+var assign = require("./Object.assign");
+var invariant = require("./invariant");
 var warning = require("./warning");
 
-var ReactElement = require("./ReactElement");
-var ReactLegacyElement = require("./ReactLegacyElement");
-var ReactNativeComponent = require("./ReactNativeComponent");
-var ReactEmptyComponent = require("./ReactEmptyComponent");
+// To avoid a cyclic dependency, we create the final class in this module
+var ReactCompositeComponentWrapper = function() { };
+assign(
+  ReactCompositeComponentWrapper.prototype,
+  ReactCompositeComponent.Mixin,
+  {
+    _instantiateReactComponent: instantiateReactComponent
+  }
+);
 
 /**
- * Given an `element` create an instance that will actually be mounted.
+ * Check if the type reference is a known internal type. I.e. not a user
+ * provided composite type.
  *
- * @param {object} element
+ * @param {function} type
+ * @return {boolean} Returns true if this is a valid internal type.
+ */
+function isInternalComponentType(type) {
+  return (
+    typeof type === 'function' &&
+    typeof type.prototype.mountComponent === 'function' &&
+    typeof type.prototype.receiveComponent === 'function'
+  );
+}
+
+/**
+ * Given a ReactNode, create an instance that will actually be mounted.
+ *
+ * @param {ReactNode} node
  * @param {*} parentCompositeType The composite type that resolved this.
  * @return {object} A new instance of the element's constructor.
  * @protected
  */
-function instantiateReactComponent(element, parentCompositeType) {
+function instantiateReactComponent(node, parentCompositeType) {
   var instance;
 
-  if ("production" !== process.env.NODE_ENV) {
-    ("production" !== process.env.NODE_ENV ? warning(
-      element && (typeof element.type === 'function' ||
-                     typeof element.type === 'string'),
-      'Only functions or strings can be mounted as React components.'
-    ) : null);
-
-    // Resolve mock instances
-    if (element.type._mockedReactClassConstructor) {
-      // If this is a mocked class, we treat the legacy factory as if it was the
-      // class constructor for future proofing unit tests. Because this might
-      // be mocked as a legacy factory, we ignore any warnings triggerd by
-      // this temporary hack.
-      ReactLegacyElement._isLegacyCallWarningEnabled = false;
-      try {
-        instance = new element.type._mockedReactClassConstructor(
-          element.props
-        );
-      } finally {
-        ReactLegacyElement._isLegacyCallWarningEnabled = true;
-      }
-
-      // If the mock implementation was a legacy factory, then it returns a
-      // element. We need to turn this into a real component instance.
-      if (ReactElement.isValidElement(instance)) {
-        instance = new instance.type(instance.props);
-      }
-
-      var render = instance.render;
-      if (!render) {
-        // For auto-mocked factories, the prototype isn't shimmed and therefore
-        // there is no render function on the instance. We replace the whole
-        // component with an empty component instance instead.
-        element = ReactEmptyComponent.getEmptyComponent();
-      } else {
-        if (render._isMockFunction && !render._getMockImplementation()) {
-          // Auto-mocked components may have a prototype with a mocked render
-          // function. For those, we'll need to mock the result of the render
-          // since we consider undefined to be invalid results from render.
-          render.mockImplementation(
-            ReactEmptyComponent.getEmptyComponent
-          );
-        }
-        instance.construct(element);
-        return instance;
-      }
-    }
+  if (node === null || node === false) {
+    node = ReactEmptyComponent.emptyElement;
   }
 
-  // Special case string values
-  if (typeof element.type === 'string') {
-    instance = ReactNativeComponent.createInstanceForTag(
-      element.type,
-      element.props,
-      parentCompositeType
-    );
+  if (typeof node === 'object') {
+    var element = node;
+    if ("production" !== process.env.NODE_ENV) {
+      ("production" !== process.env.NODE_ENV ? warning(
+        element && (typeof element.type === 'function' ||
+                    typeof element.type === 'string'),
+        'Only functions or strings can be mounted as React components.'
+      ) : null);
+    }
+
+    // Special case string values
+    if (parentCompositeType === element.type &&
+        typeof element.type === 'string') {
+      // Avoid recursion if the wrapper renders itself.
+      instance = ReactNativeComponent.createInternalComponent(element);
+      // All native components are currently wrapped in a composite so we're
+      // safe to assume that this is what we should instantiate.
+    } else if (isInternalComponentType(element.type)) {
+      // This is temporarily available for custom components that are not string
+      // represenations. I.e. ART. Once those are updated to use the string
+      // representation, we can drop this code path.
+      instance = new element.type(element);
+    } else {
+      instance = new ReactCompositeComponentWrapper();
+    }
+  } else if (typeof node === 'string' || typeof node === 'number') {
+    instance = ReactNativeComponent.createInstanceForText(node);
   } else {
-    // Normal case for non-mocks and non-strings
-    instance = new element.type(element.props);
+    ("production" !== process.env.NODE_ENV ? invariant(
+      false,
+      'Encountered invalid React node of type %s',
+      typeof node
+    ) : invariant(false));
   }
 
   if ("production" !== process.env.NODE_ENV) {
     ("production" !== process.env.NODE_ENV ? warning(
       typeof instance.construct === 'function' &&
       typeof instance.mountComponent === 'function' &&
-      typeof instance.receiveComponent === 'function',
+      typeof instance.receiveComponent === 'function' &&
+      typeof instance.unmountComponent === 'function',
       'Only React Components can be mounted.'
     ) : null);
   }
 
-  // This actually sets up the internal instance. This will become decoupled
-  // from the public instance in a future diff.
-  instance.construct(element);
+  // Sets up the instance. This can probably just move into the constructor now.
+  instance.construct(node);
+
+  // These two fields are used by the DOM and ART diffing algorithms
+  // respectively. Instead of using expandos on components, we should be
+  // storing the state needed by the diffing algorithms elsewhere.
+  instance._mountIndex = 0;
+  instance._mountImage = null;
+
+  // Internal instances should fully constructed at this point, so they should
+  // not get any new fields added to them at this point.
+  if ("production" !== process.env.NODE_ENV) {
+    if (Object.preventExtensions) {
+      Object.preventExtensions(instance);
+    }
+  }
 
   return instance;
 }
@@ -17346,7 +18195,7 @@ function instantiateReactComponent(element, parentCompositeType) {
 module.exports = instantiateReactComponent;
 
 }).call(this,require('_process'))
-},{"./ReactElement":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactElement.js","./ReactEmptyComponent":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactEmptyComponent.js","./ReactLegacyElement":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactLegacyElement.js","./ReactNativeComponent":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactNativeComponent.js","./warning":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/warning.js","_process":"/Users/sahat/Projects/trip-planner/node_modules/browserify/node_modules/process/browser.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/invariant.js":[function(require,module,exports){
+},{"./Object.assign":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/Object.assign.js","./ReactCompositeComponent":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactCompositeComponent.js","./ReactEmptyComponent":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactEmptyComponent.js","./ReactNativeComponent":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactNativeComponent.js","./invariant":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/invariant.js","./warning":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/warning.js","_process":"/Users/sahat/Projects/trip-planner/node_modules/browserify/node_modules/process/browser.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/invariant.js":[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2014, Facebook, Inc.
@@ -17415,7 +18264,7 @@ module.exports = invariant;
  * @providesModule isEventSupported
  */
 
-"use strict";
+'use strict';
 
 var ExecutionEnvironment = require("./ExecutionEnvironment");
 
@@ -17487,10 +18336,9 @@ module.exports = isEventSupported;
  */
 function isNode(object) {
   return !!(object && (
-    typeof Node === 'function' ? object instanceof Node :
-      typeof object === 'object' &&
-      typeof object.nodeType === 'number' &&
-      typeof object.nodeName === 'string'
+    ((typeof Node === 'function' ? object instanceof Node : typeof object === 'object' &&
+    typeof object.nodeType === 'number' &&
+    typeof object.nodeName === 'string'))
   ));
 }
 
@@ -17508,7 +18356,7 @@ module.exports = isNode;
  * @providesModule isTextInputElement
  */
 
-"use strict";
+'use strict';
 
 /**
  * @see http://www.whatwg.org/specs/web-apps/current-work/multipage/the-input-element.html#input-type-attr-summary
@@ -17533,8 +18381,7 @@ var supportedInputTypes = {
 
 function isTextInputElement(elem) {
   return elem && (
-    (elem.nodeName === 'INPUT' && supportedInputTypes[elem.type]) ||
-    elem.nodeName === 'TEXTAREA'
+    (elem.nodeName === 'INPUT' && supportedInputTypes[elem.type] || elem.nodeName === 'TEXTAREA')
   );
 }
 
@@ -17565,48 +18412,7 @@ function isTextNode(object) {
 
 module.exports = isTextNode;
 
-},{"./isNode":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/isNode.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/joinClasses.js":[function(require,module,exports){
-/**
- * Copyright 2013-2014, Facebook, Inc.
- * All rights reserved.
- *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
- *
- * @providesModule joinClasses
- * @typechecks static-only
- */
-
-"use strict";
-
-/**
- * Combines multiple className strings into one.
- * http://jsperf.com/joinclasses-args-vs-array
- *
- * @param {...?string} classes
- * @return {string}
- */
-function joinClasses(className/*, ... */) {
-  if (!className) {
-    className = '';
-  }
-  var nextClass;
-  var argLength = arguments.length;
-  if (argLength > 1) {
-    for (var ii = 1; ii < argLength; ii++) {
-      nextClass = arguments[ii];
-      if (nextClass) {
-        className = (className ? className + ' ' : '') + nextClass;
-      }
-    }
-  }
-  return className;
-}
-
-module.exports = joinClasses;
-
-},{}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/keyMirror.js":[function(require,module,exports){
+},{"./isNode":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/isNode.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/keyMirror.js":[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2014, Facebook, Inc.
@@ -17620,7 +18426,7 @@ module.exports = joinClasses;
  * @typechecks static-only
  */
 
-"use strict";
+'use strict';
 
 var invariant = require("./invariant");
 
@@ -17763,7 +18569,7 @@ module.exports = mapObject;
  * @typechecks static-only
  */
 
-"use strict";
+'use strict';
 
 /**
  * Memoizes the return value of a function that accepts one string argument.
@@ -17774,11 +18580,10 @@ module.exports = mapObject;
 function memoizeStringOnly(callback) {
   var cache = {};
   return function(string) {
-    if (cache.hasOwnProperty(string)) {
-      return cache[string];
-    } else {
-      return cache[string] = callback.call(this, string);
+    if (!cache.hasOwnProperty(string)) {
+      cache[string] = callback.call(this, string);
     }
+    return cache[string];
   };
 }
 
@@ -17830,7 +18635,7 @@ module.exports = monitorCodeUse;
  *
  * @providesModule onlyChild
  */
-"use strict";
+'use strict';
 
 var ReactElement = require("./ReactElement");
 
@@ -17926,7 +18731,9 @@ module.exports = performanceNow;
  * @providesModule setInnerHTML
  */
 
-"use strict";
+/* globals MSApp */
+
+'use strict';
 
 var ExecutionEnvironment = require("./ExecutionEnvironment");
 
@@ -17944,6 +18751,15 @@ var NONVISIBLE_TEST = /<(!--|link|noscript|meta|script|style)[ \r\n\t\f\/>]/;
 var setInnerHTML = function(node, html) {
   node.innerHTML = html;
 };
+
+// Win8 apps: Allow all html to be inserted
+if (typeof MSApp !== 'undefined' && MSApp.execUnsafeLocalFunction) {
+  setInnerHTML = function(node, html) {
+    MSApp.execUnsafeLocalFunction(function() {
+      node.innerHTML = html;
+    });
+  };
+}
 
 if (ExecutionEnvironment.canUseDOM) {
   // IE8: When updating a just created node with innerHTML only leading
@@ -18004,7 +18820,7 @@ module.exports = setInnerHTML;
  * @providesModule shallowEqual
  */
 
-"use strict";
+'use strict';
 
 /**
  * Performs equality by iterating through keys on an object and returning
@@ -18037,6 +18853,7 @@ function shallowEqual(objA, objB) {
 module.exports = shallowEqual;
 
 },{}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/shouldUpdateReactComponent.js":[function(require,module,exports){
+(function (process){
 /**
  * Copyright 2013-2014, Facebook, Inc.
  * All rights reserved.
@@ -18049,7 +18866,9 @@ module.exports = shallowEqual;
  * @typechecks static-only
  */
 
-"use strict";
+'use strict';
+
+var monitorCodeUse = require("./monitorCodeUse");
 
 /**
  * Given a `prevElement` and `nextElement`, determines if the existing
@@ -18063,18 +18882,59 @@ module.exports = shallowEqual;
  * @protected
  */
 function shouldUpdateReactComponent(prevElement, nextElement) {
-  if (prevElement && nextElement &&
-      prevElement.type === nextElement.type &&
-      prevElement.key === nextElement.key &&
-      prevElement._owner === nextElement._owner) {
-    return true;
+  if (prevElement != null && nextElement != null) {
+    var prevType = typeof prevElement;
+    var nextType = typeof nextElement;
+    if (prevType === 'string' || prevType === 'number') {
+      return (nextType === 'string' || nextType === 'number');
+    } else {
+      if (nextType === 'object' &&
+          prevElement.type === nextElement.type &&
+          prevElement.key === nextElement.key) {
+        var ownersMatch = prevElement._owner === nextElement._owner;
+        var prevName = null;
+        var nextName = null;
+        var nextDisplayName = null;
+        if ("production" !== process.env.NODE_ENV) {
+          if (!ownersMatch) {
+            if (prevElement._owner != null &&
+                prevElement._owner.getPublicInstance() != null &&
+                prevElement._owner.getPublicInstance().constructor != null) {
+              prevName =
+                prevElement._owner.getPublicInstance().constructor.displayName;
+            }
+            if (nextElement._owner != null &&
+                nextElement._owner.getPublicInstance() != null &&
+                nextElement._owner.getPublicInstance().constructor != null) {
+              nextName =
+                nextElement._owner.getPublicInstance().constructor.displayName;
+            }
+            if (nextElement.type != null &&
+                nextElement.type.displayName != null) {
+              nextDisplayName = nextElement.type.displayName;
+            }
+            monitorCodeUse(
+              'react_should_update_owner_is_useful',
+              {
+                key: prevElement.key,
+                prevOwner: prevName,
+                nextOwner: nextName,
+                nextDisplayName: nextDisplayName
+              }
+            );
+          }
+        }
+        return ownersMatch;
+      }
+    }
   }
   return false;
 }
 
 module.exports = shouldUpdateReactComponent;
 
-},{}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/toArray.js":[function(require,module,exports){
+}).call(this,require('_process'))
+},{"./monitorCodeUse":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/monitorCodeUse.js","_process":"/Users/sahat/Projects/trip-planner/node_modules/browserify/node_modules/process/browser.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/toArray.js":[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2014, Facebook, Inc.
@@ -18159,22 +19019,20 @@ module.exports = toArray;
  * @providesModule traverseAllChildren
  */
 
-"use strict";
+'use strict';
 
 var ReactElement = require("./ReactElement");
 var ReactInstanceHandles = require("./ReactInstanceHandles");
 
+var getIteratorFn = require("./getIteratorFn");
 var invariant = require("./invariant");
 
 var SEPARATOR = ReactInstanceHandles.SEPARATOR;
 var SUBSEPARATOR = ':';
 
 /**
- * TODO: Test that:
- * 1. `mapChildren` transforms strings and numbers into `ReactTextComponent`.
- * 2. it('should fail when supplied duplicate key', function() {
- * 3. That a single child and an array with one item have the same key pattern.
- * });
+ * TODO: Test that a single child and an array with one item have the same key
+ * pattern.
  */
 
 var userProvidedKeyEscaperLookup = {
@@ -18238,58 +19096,90 @@ function wrapUserProvidedKey(key) {
  * process.
  * @return {!number} The number of children in this subtree.
  */
-var traverseAllChildrenImpl =
-  function(children, nameSoFar, indexSoFar, callback, traverseContext) {
-    var nextName, nextIndex;
-    var subtreeCount = 0;  // Count of children found in the current subtree.
-    if (Array.isArray(children)) {
-      for (var i = 0; i < children.length; i++) {
-        var child = children[i];
-        nextName = (
-          nameSoFar +
-          (nameSoFar ? SUBSEPARATOR : SEPARATOR) +
-          getComponentKey(child, i)
-        );
-        nextIndex = indexSoFar + subtreeCount;
-        subtreeCount += traverseAllChildrenImpl(
-          child,
-          nextName,
-          nextIndex,
-          callback,
-          traverseContext
-        );
-      }
-    } else {
-      var type = typeof children;
-      var isOnlyChild = nameSoFar === '';
+function traverseAllChildrenImpl(
+  children,
+  nameSoFar,
+  indexSoFar,
+  callback,
+  traverseContext
+) {
+  var type = typeof children;
+
+  if (type === 'undefined' || type === 'boolean') {
+    // All of the above are perceived as null.
+    children = null;
+  }
+
+  if (children === null ||
+      type === 'string' ||
+      type === 'number' ||
+      ReactElement.isValidElement(children)) {
+    callback(
+      traverseContext,
+      children,
       // If it's the only child, treat the name as if it was wrapped in an array
-      // so that it's consistent if the number of children grows
-      var storageName =
-        isOnlyChild ? SEPARATOR + getComponentKey(children, 0) : nameSoFar;
-      if (children == null || type === 'boolean') {
-        // All of the above are perceived as null.
-        callback(traverseContext, null, storageName, indexSoFar);
-        subtreeCount = 1;
-      } else if (type === 'string' || type === 'number' ||
-                 ReactElement.isValidElement(children)) {
-        callback(traverseContext, children, storageName, indexSoFar);
-        subtreeCount = 1;
-      } else if (type === 'object') {
-        ("production" !== process.env.NODE_ENV ? invariant(
-          !children || children.nodeType !== 1,
-          'traverseAllChildren(...): Encountered an invalid child; DOM ' +
-          'elements are not valid children of React components.'
-        ) : invariant(!children || children.nodeType !== 1));
-        for (var key in children) {
-          if (children.hasOwnProperty(key)) {
+      // so that it's consistent if the number of children grows.
+      nameSoFar === '' ? SEPARATOR + getComponentKey(children, 0) : nameSoFar,
+      indexSoFar
+    );
+    return 1;
+  }
+
+  var child, nextName, nextIndex;
+  var subtreeCount = 0; // Count of children found in the current subtree.
+
+  if (Array.isArray(children)) {
+    for (var i = 0; i < children.length; i++) {
+      child = children[i];
+      nextName = (
+        (nameSoFar !== '' ? nameSoFar + SUBSEPARATOR : SEPARATOR) +
+        getComponentKey(child, i)
+      );
+      nextIndex = indexSoFar + subtreeCount;
+      subtreeCount += traverseAllChildrenImpl(
+        child,
+        nextName,
+        nextIndex,
+        callback,
+        traverseContext
+      );
+    }
+  } else {
+    var iteratorFn = getIteratorFn(children);
+    if (iteratorFn) {
+      var iterator = iteratorFn.call(children);
+      var step;
+      if (iteratorFn !== children.entries) {
+        var ii = 0;
+        while (!(step = iterator.next()).done) {
+          child = step.value;
+          nextName = (
+            (nameSoFar !== '' ? nameSoFar + SUBSEPARATOR : SEPARATOR) +
+            getComponentKey(child, ii++)
+          );
+          nextIndex = indexSoFar + subtreeCount;
+          subtreeCount += traverseAllChildrenImpl(
+            child,
+            nextName,
+            nextIndex,
+            callback,
+            traverseContext
+          );
+        }
+      } else {
+        // Iterator will provide entry [k,v] tuples rather than values.
+        while (!(step = iterator.next()).done) {
+          var entry = step.value;
+          if (entry) {
+            child = entry[1];
             nextName = (
-              nameSoFar + (nameSoFar ? SUBSEPARATOR : SEPARATOR) +
-              wrapUserProvidedKey(key) + SUBSEPARATOR +
-              getComponentKey(children[key], 0)
+              (nameSoFar !== '' ? nameSoFar + SUBSEPARATOR : SEPARATOR) +
+              wrapUserProvidedKey(entry[0]) + SUBSEPARATOR +
+              getComponentKey(child, 0)
             );
             nextIndex = indexSoFar + subtreeCount;
             subtreeCount += traverseAllChildrenImpl(
-              children[key],
+              child,
               nextName,
               nextIndex,
               callback,
@@ -18298,9 +19188,35 @@ var traverseAllChildrenImpl =
           }
         }
       }
+    } else if (type === 'object') {
+      ("production" !== process.env.NODE_ENV ? invariant(
+        children.nodeType !== 1,
+        'traverseAllChildren(...): Encountered an invalid child; DOM ' +
+        'elements are not valid children of React components.'
+      ) : invariant(children.nodeType !== 1));
+      for (var key in children) {
+        if (children.hasOwnProperty(key)) {
+          child = children[key];
+          nextName = (
+            (nameSoFar !== '' ? nameSoFar + SUBSEPARATOR : SEPARATOR) +
+            wrapUserProvidedKey(key) + SUBSEPARATOR +
+            getComponentKey(child, 0)
+          );
+          nextIndex = indexSoFar + subtreeCount;
+          subtreeCount += traverseAllChildrenImpl(
+            child,
+            nextName,
+            nextIndex,
+            callback,
+            traverseContext
+          );
+        }
+      }
     }
-    return subtreeCount;
-  };
+  }
+
+  return subtreeCount;
+}
 
 /**
  * Traverses children that are typically specified as `props.children`, but
@@ -18329,7 +19245,7 @@ function traverseAllChildren(children, callback, traverseContext) {
 module.exports = traverseAllChildren;
 
 }).call(this,require('_process'))
-},{"./ReactElement":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactElement.js","./ReactInstanceHandles":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactInstanceHandles.js","./invariant":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/invariant.js","_process":"/Users/sahat/Projects/trip-planner/node_modules/browserify/node_modules/process/browser.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/warning.js":[function(require,module,exports){
+},{"./ReactElement":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactElement.js","./ReactInstanceHandles":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/ReactInstanceHandles.js","./getIteratorFn":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/getIteratorFn.js","./invariant":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/invariant.js","_process":"/Users/sahat/Projects/trip-planner/node_modules/browserify/node_modules/process/browser.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/lib/warning.js":[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2014, Facebook, Inc.
@@ -18364,9 +19280,20 @@ if ("production" !== process.env.NODE_ENV) {
       );
     }
 
+    if (format.indexOf('Failed CompositeComponent proptype check. ') === 0) {
+      return; // Ignore CompositeComponent proptype check.
+    }
+
     if (!condition) {
       var argIndex = 0;
-      console.warn('Warning: ' + format.replace(/%s/g, function()  {return args[argIndex++];}));
+      var message = 'Warning: ' + format.replace(/%s/g, function()  {return args[argIndex++];});
+      console.warn(message);
+      try {
+        // --- Welcome to debugging React ---
+        // This error was thrown as a convenience so that you can use this stack
+        // to find the callsite that caused this warning to fire.
+        throw new Error(message);
+      } catch(x) {}
     }
   };
 }
@@ -18377,4 +19304,2562 @@ module.exports = warning;
 },{"./emptyFunction":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/emptyFunction.js","_process":"/Users/sahat/Projects/trip-planner/node_modules/browserify/node_modules/process/browser.js"}],"/Users/sahat/Projects/trip-planner/node_modules/react/react.js":[function(require,module,exports){
 module.exports = require('./lib/React');
 
-},{"./lib/React":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/React.js"}]},{},["./client/main.js"]);
+},{"./lib/React":"/Users/sahat/Projects/trip-planner/node_modules/react/lib/React.js"}],"/Users/sahat/Projects/trip-planner/node_modules/reflux/index.js":[function(require,module,exports){
+module.exports = require('./src');
+
+},{"./src":"/Users/sahat/Projects/trip-planner/node_modules/reflux/src/index.js"}],"/Users/sahat/Projects/trip-planner/node_modules/reflux/node_modules/eventemitter3/index.js":[function(require,module,exports){
+'use strict';
+
+/**
+ * Representation of a single EventEmitter function.
+ *
+ * @param {Function} fn Event handler to be called.
+ * @param {Mixed} context Context for function execution.
+ * @param {Boolean} once Only emit once
+ * @api private
+ */
+function EE(fn, context, once) {
+  this.fn = fn;
+  this.context = context;
+  this.once = once || false;
+}
+
+/**
+ * Minimal EventEmitter interface that is molded against the Node.js
+ * EventEmitter interface.
+ *
+ * @constructor
+ * @api public
+ */
+function EventEmitter() { /* Nothing to set */ }
+
+/**
+ * Holds the assigned EventEmitters by name.
+ *
+ * @type {Object}
+ * @private
+ */
+EventEmitter.prototype._events = undefined;
+
+/**
+ * Return a list of assigned event listeners.
+ *
+ * @param {String} event The events that should be listed.
+ * @returns {Array}
+ * @api public
+ */
+EventEmitter.prototype.listeners = function listeners(event) {
+  if (!this._events || !this._events[event]) return [];
+  if (this._events[event].fn) return [this._events[event].fn];
+
+  for (var i = 0, l = this._events[event].length, ee = new Array(l); i < l; i++) {
+    ee[i] = this._events[event][i].fn;
+  }
+
+  return ee;
+};
+
+/**
+ * Emit an event to all registered event listeners.
+ *
+ * @param {String} event The name of the event.
+ * @returns {Boolean} Indication if we've emitted an event.
+ * @api public
+ */
+EventEmitter.prototype.emit = function emit(event, a1, a2, a3, a4, a5) {
+  if (!this._events || !this._events[event]) return false;
+
+  var listeners = this._events[event]
+    , len = arguments.length
+    , args
+    , i;
+
+  if ('function' === typeof listeners.fn) {
+    if (listeners.once) this.removeListener(event, listeners.fn, true);
+
+    switch (len) {
+      case 1: return listeners.fn.call(listeners.context), true;
+      case 2: return listeners.fn.call(listeners.context, a1), true;
+      case 3: return listeners.fn.call(listeners.context, a1, a2), true;
+      case 4: return listeners.fn.call(listeners.context, a1, a2, a3), true;
+      case 5: return listeners.fn.call(listeners.context, a1, a2, a3, a4), true;
+      case 6: return listeners.fn.call(listeners.context, a1, a2, a3, a4, a5), true;
+    }
+
+    for (i = 1, args = new Array(len -1); i < len; i++) {
+      args[i - 1] = arguments[i];
+    }
+
+    listeners.fn.apply(listeners.context, args);
+  } else {
+    var length = listeners.length
+      , j;
+
+    for (i = 0; i < length; i++) {
+      if (listeners[i].once) this.removeListener(event, listeners[i].fn, true);
+
+      switch (len) {
+        case 1: listeners[i].fn.call(listeners[i].context); break;
+        case 2: listeners[i].fn.call(listeners[i].context, a1); break;
+        case 3: listeners[i].fn.call(listeners[i].context, a1, a2); break;
+        default:
+          if (!args) for (j = 1, args = new Array(len -1); j < len; j++) {
+            args[j - 1] = arguments[j];
+          }
+
+          listeners[i].fn.apply(listeners[i].context, args);
+      }
+    }
+  }
+
+  return true;
+};
+
+/**
+ * Register a new EventListener for the given event.
+ *
+ * @param {String} event Name of the event.
+ * @param {Functon} fn Callback function.
+ * @param {Mixed} context The context of the function.
+ * @api public
+ */
+EventEmitter.prototype.on = function on(event, fn, context) {
+  var listener = new EE(fn, context || this);
+
+  if (!this._events) this._events = {};
+  if (!this._events[event]) this._events[event] = listener;
+  else {
+    if (!this._events[event].fn) this._events[event].push(listener);
+    else this._events[event] = [
+      this._events[event], listener
+    ];
+  }
+
+  return this;
+};
+
+/**
+ * Add an EventListener that's only called once.
+ *
+ * @param {String} event Name of the event.
+ * @param {Function} fn Callback function.
+ * @param {Mixed} context The context of the function.
+ * @api public
+ */
+EventEmitter.prototype.once = function once(event, fn, context) {
+  var listener = new EE(fn, context || this, true);
+
+  if (!this._events) this._events = {};
+  if (!this._events[event]) this._events[event] = listener;
+  else {
+    if (!this._events[event].fn) this._events[event].push(listener);
+    else this._events[event] = [
+      this._events[event], listener
+    ];
+  }
+
+  return this;
+};
+
+/**
+ * Remove event listeners.
+ *
+ * @param {String} event The event we want to remove.
+ * @param {Function} fn The listener that we need to find.
+ * @param {Boolean} once Only remove once listeners.
+ * @api public
+ */
+EventEmitter.prototype.removeListener = function removeListener(event, fn, once) {
+  if (!this._events || !this._events[event]) return this;
+
+  var listeners = this._events[event]
+    , events = [];
+
+  if (fn) {
+    if (listeners.fn && (listeners.fn !== fn || (once && !listeners.once))) {
+      events.push(listeners);
+    }
+    if (!listeners.fn) for (var i = 0, length = listeners.length; i < length; i++) {
+      if (listeners[i].fn !== fn || (once && !listeners[i].once)) {
+        events.push(listeners[i]);
+      }
+    }
+  }
+
+  //
+  // Reset the array, or remove it completely if we have no more listeners.
+  //
+  if (events.length) {
+    this._events[event] = events.length === 1 ? events[0] : events;
+  } else {
+    delete this._events[event];
+  }
+
+  return this;
+};
+
+/**
+ * Remove all listeners or only the listeners for the specified event.
+ *
+ * @param {String} event The event want to remove all listeners for.
+ * @api public
+ */
+EventEmitter.prototype.removeAllListeners = function removeAllListeners(event) {
+  if (!this._events) return this;
+
+  if (event) delete this._events[event];
+  else this._events = {};
+
+  return this;
+};
+
+//
+// Alias methods names because people roll like that.
+//
+EventEmitter.prototype.off = EventEmitter.prototype.removeListener;
+EventEmitter.prototype.addListener = EventEmitter.prototype.on;
+
+//
+// This function doesn't apply anymore.
+//
+EventEmitter.prototype.setMaxListeners = function setMaxListeners() {
+  return this;
+};
+
+//
+// Expose the module.
+//
+EventEmitter.EventEmitter = EventEmitter;
+EventEmitter.EventEmitter2 = EventEmitter;
+EventEmitter.EventEmitter3 = EventEmitter;
+
+//
+// Expose the module.
+//
+module.exports = EventEmitter;
+
+},{}],"/Users/sahat/Projects/trip-planner/node_modules/reflux/node_modules/native-promise-only/npo.js":[function(require,module,exports){
+(function (global){
+/*! Native Promise Only
+    v0.7.6-a (c) Kyle Simpson
+    MIT License: http://getify.mit-license.org
+*/
+!function(t,n,e){n[t]=n[t]||e(),"undefined"!=typeof module&&module.exports?module.exports=n[t]:"function"==typeof define&&define.amd&&define(function(){return n[t]})}("Promise","undefined"!=typeof global?global:this,function(){"use strict";function t(t,n){l.add(t,n),h||(h=y(l.drain))}function n(t){var n,e=typeof t;return null==t||"object"!=e&&"function"!=e||(n=t.then),"function"==typeof n?n:!1}function e(){for(var t=0;t<this.chain.length;t++)o(this,1===this.state?this.chain[t].success:this.chain[t].failure,this.chain[t]);this.chain.length=0}function o(t,e,o){var r,i;try{e===!1?o.reject(t.msg):(r=e===!0?t.msg:e.call(void 0,t.msg),r===o.promise?o.reject(TypeError("Promise-chain cycle")):(i=n(r))?i.call(r,o.resolve,o.reject):o.resolve(r))}catch(c){o.reject(c)}}function r(o){var c,u,a=this;if(!a.triggered){a.triggered=!0,a.def&&(a=a.def);try{(c=n(o))?(u=new f(a),c.call(o,function(){r.apply(u,arguments)},function(){i.apply(u,arguments)})):(a.msg=o,a.state=1,a.chain.length>0&&t(e,a))}catch(s){i.call(u||new f(a),s)}}}function i(n){var o=this;o.triggered||(o.triggered=!0,o.def&&(o=o.def),o.msg=n,o.state=2,o.chain.length>0&&t(e,o))}function c(t,n,e,o){for(var r=0;r<n.length;r++)!function(r){t.resolve(n[r]).then(function(t){e(r,t)},o)}(r)}function f(t){this.def=t,this.triggered=!1}function u(t){this.promise=t,this.state=0,this.triggered=!1,this.chain=[],this.msg=void 0}function a(n){if("function"!=typeof n)throw TypeError("Not a function");if(0!==this.__NPO__)throw TypeError("Not a promise");this.__NPO__=1;var o=new u(this);this.then=function(n,r){var i={success:"function"==typeof n?n:!0,failure:"function"==typeof r?r:!1};return i.promise=new this.constructor(function(t,n){if("function"!=typeof t||"function"!=typeof n)throw TypeError("Not a function");i.resolve=t,i.reject=n}),o.chain.push(i),0!==o.state&&t(e,o),i.promise},this["catch"]=function(t){return this.then(void 0,t)};try{n.call(void 0,function(t){r.call(o,t)},function(t){i.call(o,t)})}catch(c){i.call(o,c)}}var s,h,l,p=Object.prototype.toString,y="undefined"!=typeof setImmediate?function(t){return setImmediate(t)}:setTimeout;try{Object.defineProperty({},"x",{}),s=function(t,n,e,o){return Object.defineProperty(t,n,{value:e,writable:!0,configurable:o!==!1})}}catch(d){s=function(t,n,e){return t[n]=e,t}}l=function(){function t(t,n){this.fn=t,this.self=n,this.next=void 0}var n,e,o;return{add:function(r,i){o=new t(r,i),e?e.next=o:n=o,e=o,o=void 0},drain:function(){var t=n;for(n=e=h=void 0;t;)t.fn.call(t.self),t=t.next}}}();var g=s({},"constructor",a,!1);return s(a,"prototype",g,!1),s(g,"__NPO__",0,!1),s(a,"resolve",function(t){var n=this;return t&&"object"==typeof t&&1===t.__NPO__?t:new n(function(n,e){if("function"!=typeof n||"function"!=typeof e)throw TypeError("Not a function");n(t)})}),s(a,"reject",function(t){return new this(function(n,e){if("function"!=typeof n||"function"!=typeof e)throw TypeError("Not a function");e(t)})}),s(a,"all",function(t){var n=this;return"[object Array]"!=p.call(t)?n.reject(TypeError("Not an array")):0===t.length?n.resolve([]):new n(function(e,o){if("function"!=typeof e||"function"!=typeof o)throw TypeError("Not a function");var r=t.length,i=Array(r),f=0;c(n,t,function(t,n){i[t]=n,++f===r&&e(i)},o)})}),s(a,"race",function(t){var n=this;return"[object Array]"!=p.call(t)?n.reject(TypeError("Not an array")):new n(function(e,o){if("function"!=typeof e||"function"!=typeof o)throw TypeError("Not a function");c(n,t,function(t,n){e(n)},o)})}),a});
+
+}).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
+},{}],"/Users/sahat/Projects/trip-planner/node_modules/reflux/src/ActionMethods.js":[function(require,module,exports){
+/**
+ * A module of methods that you want to include in all actions.
+ * This module is consumed by `createAction`.
+ */
+module.exports = {
+};
+
+},{}],"/Users/sahat/Projects/trip-planner/node_modules/reflux/src/Keep.js":[function(require,module,exports){
+exports.createdStores = [];
+
+exports.createdActions = [];
+
+exports.reset = function() {
+    while(exports.createdStores.length) {
+        exports.createdStores.pop();
+    }
+    while(exports.createdActions.length) {
+        exports.createdActions.pop();
+    }
+};
+
+},{}],"/Users/sahat/Projects/trip-planner/node_modules/reflux/src/ListenerMethods.js":[function(require,module,exports){
+var _ = require('./utils'),
+    maker = require('./joins').instanceJoinCreator;
+
+/**
+ * Extract child listenables from a parent from their
+ * children property and return them in a keyed Object
+ *
+ * @param {Object} listenable The parent listenable
+ */
+var mapChildListenables = function(listenable) {
+    var i = 0, children = {}, childName;
+    for (;i < (listenable.children||[]).length; ++i) {
+        childName = listenable.children[i];
+        if(listenable[childName]){
+            children[childName] = listenable[childName];
+        }
+    }
+    return children;
+};
+
+/**
+ * Make a flat dictionary of all listenables including their
+ * possible children (recursively), concatenating names in camelCase.
+ *
+ * @param {Object} listenables The top-level listenables
+ */
+var flattenListenables = function(listenables) {
+    var flattened = {};
+    for(var key in listenables){
+        var listenable = listenables[key];
+        var childMap = mapChildListenables(listenable);
+
+        // recursively flatten children
+        var children = flattenListenables(childMap);
+
+        // add the primary listenable and chilren
+        flattened[key] = listenable;
+        for(var childKey in children){
+            var childListenable = children[childKey];
+            flattened[key + _.capitalize(childKey)] = childListenable;
+        }
+    }
+
+    return flattened;
+};
+
+/**
+ * A module of methods related to listening.
+ */
+module.exports = {
+
+    /**
+     * An internal utility function used by `validateListening`
+     *
+     * @param {Action|Store} listenable The listenable we want to search for
+     * @returns {Boolean} The result of a recursive search among `this.subscriptions`
+     */
+    hasListener: function(listenable) {
+        var i = 0, j, listener, listenables;
+        for (;i < (this.subscriptions||[]).length; ++i) {
+            listenables = [].concat(this.subscriptions[i].listenable);
+            for (j = 0; j < listenables.length; j++){
+                listener = listenables[j];
+                if (listener === listenable || listener.hasListener && listener.hasListener(listenable)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    },
+
+    /**
+     * A convenience method that listens to all listenables in the given object.
+     *
+     * @param {Object} listenables An object of listenables. Keys will be used as callback method names.
+     */
+    listenToMany: function(listenables){
+        var allListenables = flattenListenables(listenables);
+        for(var key in allListenables){
+            var cbname = _.callbackName(key),
+                localname = this[cbname] ? cbname : this[key] ? key : undefined;
+            if (localname){
+                this.listenTo(allListenables[key],localname,this[cbname+"Default"]||this[localname+"Default"]||localname);
+            }
+        }
+    },
+
+    /**
+     * Checks if the current context can listen to the supplied listenable
+     *
+     * @param {Action|Store} listenable An Action or Store that should be
+     *  listened to.
+     * @returns {String|Undefined} An error message, or undefined if there was no problem.
+     */
+    validateListening: function(listenable){
+        if (listenable === this) {
+            return "Listener is not able to listen to itself";
+        }
+        if (!_.isFunction(listenable.listen)) {
+            return listenable + " is missing a listen method";
+        }
+        if (listenable.hasListener && listenable.hasListener(this)) {
+            return "Listener cannot listen to this listenable because of circular loop";
+        }
+    },
+
+    /**
+     * Sets up a subscription to the given listenable for the context object
+     *
+     * @param {Action|Store} listenable An Action or Store that should be
+     *  listened to.
+     * @param {Function|String} callback The callback to register as event handler
+     * @param {Function|String} defaultCallback The callback to register as default handler
+     * @returns {Object} A subscription obj where `stop` is an unsub function and `listenable` is the object being listened to
+     */
+    listenTo: function(listenable, callback, defaultCallback) {
+        var desub, unsubscriber, subscriptionobj, subs = this.subscriptions = this.subscriptions || [];
+        _.throwIf(this.validateListening(listenable));
+        this.fetchInitialState(listenable, defaultCallback);
+        desub = listenable.listen(this[callback]||callback, this);
+        unsubscriber = function() {
+            var index = subs.indexOf(subscriptionobj);
+            _.throwIf(index === -1,'Tried to remove listen already gone from subscriptions list!');
+            subs.splice(index, 1);
+            desub();
+        };
+        subscriptionobj = {
+            stop: unsubscriber,
+            listenable: listenable
+        };
+        subs.push(subscriptionobj);
+        return subscriptionobj;
+    },
+
+    /**
+     * Stops listening to a single listenable
+     *
+     * @param {Action|Store} listenable The action or store we no longer want to listen to
+     * @returns {Boolean} True if a subscription was found and removed, otherwise false.
+     */
+    stopListeningTo: function(listenable){
+        var sub, i = 0, subs = this.subscriptions || [];
+        for(;i < subs.length; i++){
+            sub = subs[i];
+            if (sub.listenable === listenable){
+                sub.stop();
+                _.throwIf(subs.indexOf(sub)!==-1,'Failed to remove listen from subscriptions list!');
+                return true;
+            }
+        }
+        return false;
+    },
+
+    /**
+     * Stops all subscriptions and empties subscriptions array
+     */
+    stopListeningToAll: function(){
+        var remaining, subs = this.subscriptions || [];
+        while((remaining=subs.length)){
+            subs[0].stop();
+            _.throwIf(subs.length!==remaining-1,'Failed to remove listen from subscriptions list!');
+        }
+    },
+
+    /**
+     * Used in `listenTo`. Fetches initial data from a publisher if it has a `getInitialState` method.
+     * @param {Action|Store} listenable The publisher we want to get initial state from
+     * @param {Function|String} defaultCallback The method to receive the data
+     */
+    fetchInitialState: function (listenable, defaultCallback) {
+        defaultCallback = (defaultCallback && this[defaultCallback]) || defaultCallback;
+        var me = this;
+        if (_.isFunction(defaultCallback) && _.isFunction(listenable.getInitialState)) {
+            var data = listenable.getInitialState();
+            if (data && _.isFunction(data.then)) {
+                data.then(function() {
+                    defaultCallback.apply(me, arguments);
+                });
+            } else {
+                defaultCallback.call(this, data);
+            }
+        }
+    },
+
+    /**
+     * The callback will be called once all listenables have triggered at least once.
+     * It will be invoked with the last emission from each listenable.
+     * @param {...Publishers} publishers Publishers that should be tracked.
+     * @param {Function|String} callback The method to call when all publishers have emitted
+     * @returns {Object} A subscription obj where `stop` is an unsub function and `listenable` is an array of listenables
+     */
+    joinTrailing: maker("last"),
+
+    /**
+     * The callback will be called once all listenables have triggered at least once.
+     * It will be invoked with the first emission from each listenable.
+     * @param {...Publishers} publishers Publishers that should be tracked.
+     * @param {Function|String} callback The method to call when all publishers have emitted
+     * @returns {Object} A subscription obj where `stop` is an unsub function and `listenable` is an array of listenables
+     */
+    joinLeading: maker("first"),
+
+    /**
+     * The callback will be called once all listenables have triggered at least once.
+     * It will be invoked with all emission from each listenable.
+     * @param {...Publishers} publishers Publishers that should be tracked.
+     * @param {Function|String} callback The method to call when all publishers have emitted
+     * @returns {Object} A subscription obj where `stop` is an unsub function and `listenable` is an array of listenables
+     */
+    joinConcat: maker("all"),
+
+    /**
+     * The callback will be called once all listenables have triggered.
+     * If a callback triggers twice before that happens, an error is thrown.
+     * @param {...Publishers} publishers Publishers that should be tracked.
+     * @param {Function|String} callback The method to call when all publishers have emitted
+     * @returns {Object} A subscription obj where `stop` is an unsub function and `listenable` is an array of listenables
+     */
+    joinStrict: maker("strict")
+};
+
+},{"./joins":"/Users/sahat/Projects/trip-planner/node_modules/reflux/src/joins.js","./utils":"/Users/sahat/Projects/trip-planner/node_modules/reflux/src/utils.js"}],"/Users/sahat/Projects/trip-planner/node_modules/reflux/src/ListenerMixin.js":[function(require,module,exports){
+var _ = require('./utils'),
+    ListenerMethods = require('./ListenerMethods');
+
+/**
+ * A module meant to be consumed as a mixin by a React component. Supplies the methods from
+ * `ListenerMethods` mixin and takes care of teardown of subscriptions.
+ * Note that if you're using the `connect` mixin you don't need this mixin, as connect will
+ * import everything this mixin contains!
+ */
+module.exports = _.extend({
+
+    /**
+     * Cleans up all listener previously registered.
+     */
+    componentWillUnmount: ListenerMethods.stopListeningToAll
+
+}, ListenerMethods);
+
+},{"./ListenerMethods":"/Users/sahat/Projects/trip-planner/node_modules/reflux/src/ListenerMethods.js","./utils":"/Users/sahat/Projects/trip-planner/node_modules/reflux/src/utils.js"}],"/Users/sahat/Projects/trip-planner/node_modules/reflux/src/PublisherMethods.js":[function(require,module,exports){
+var _ = require('./utils');
+
+/**
+ * A module of methods for object that you want to be able to listen to.
+ * This module is consumed by `createStore` and `createAction`
+ */
+module.exports = {
+
+    /**
+     * Hook used by the publisher that is invoked before emitting
+     * and before `shouldEmit`. The arguments are the ones that the action
+     * is invoked with. If this function returns something other than
+     * undefined, that will be passed on as arguments for shouldEmit and
+     * emission.
+     */
+    preEmit: function() {},
+
+    /**
+     * Hook used by the publisher after `preEmit` to determine if the
+     * event should be emitted with given arguments. This may be overridden
+     * in your application, default implementation always returns true.
+     *
+     * @returns {Boolean} true if event should be emitted
+     */
+    shouldEmit: function() { return true; },
+
+    /**
+     * Subscribes the given callback for action triggered
+     *
+     * @param {Function} callback The callback to register as event handler
+     * @param {Mixed} [optional] bindContext The context to bind the callback with
+     * @returns {Function} Callback that unsubscribes the registered event handler
+     */
+    listen: function(callback, bindContext) {
+        bindContext = bindContext || this;
+        var eventHandler = function(args) {
+            callback.apply(bindContext, args);
+        }, me = this;
+        this.emitter.addListener(this.eventLabel, eventHandler);
+        return function() {
+            me.emitter.removeListener(me.eventLabel, eventHandler);
+        };
+    },
+
+    /**
+     * Attach handlers to promise that trigger the completed and failed
+     * child publishers, if available.
+     *
+     * @param {Object} The promise to attach to
+     */
+    promise: function(promise) {
+        var me = this;
+
+        var canHandlePromise =
+            this.children.indexOf('completed') >= 0 &&
+            this.children.indexOf('failed') >= 0;
+
+        if (!canHandlePromise){
+            throw new Error('Publisher must have "completed" and "failed" child publishers');
+        }
+
+        promise.then(function(response) {
+            return me.completed(response);
+        });
+        // IE compatibility - catch is a reserved word - without bracket notation source compilation will fail under IE
+        promise["catch"](function(error) {
+            return me.failed(error);
+        });
+    },
+
+    /**
+     * Subscribes the given callback for action triggered, which should
+     * return a promise that in turn is passed to `this.promise`
+     *
+     * @param {Function} callback The callback to register as event handler
+     */
+    listenAndPromise: function(callback, bindContext) {
+        var me = this;
+        bindContext = bindContext || this;
+
+        return this.listen(function() {
+
+            if (!callback) {
+                throw new Error('Expected a function returning a promise but got ' + callback);
+            }
+
+            var args = arguments,
+                promise = callback.apply(bindContext, args);
+            return me.promise.call(me, promise);
+        }, bindContext);
+    },
+
+    /**
+     * Publishes an event using `this.emitter` (if `shouldEmit` agrees)
+     */
+    trigger: function() {
+        var args = arguments,
+            pre = this.preEmit.apply(this, args);
+        args = pre === undefined ? args : _.isArguments(pre) ? pre : [].concat(pre);
+        if (this.shouldEmit.apply(this, args)) {
+            this.emitter.emit(this.eventLabel, args);
+        }
+    },
+
+    /**
+     * Tries to publish the event on the next tick
+     */
+    triggerAsync: function(){
+        var args = arguments,me = this;
+        _.nextTick(function() {
+            me.trigger.apply(me, args);
+        });
+    },
+
+    /**
+     * Returns a Promise for the triggered action
+     */
+    triggerPromise: function(){
+        var me = this;
+        var args = arguments;
+
+        var canHandlePromise =
+            this.children.indexOf('completed') >= 0 &&
+            this.children.indexOf('failed') >= 0;
+
+        if (!canHandlePromise){
+            throw new Error('Publisher must have "completed" and "failed" child publishers');
+        }
+
+        var promise = _.createPromise(function(resolve, reject) {
+            var removeSuccess = me.completed.listen(function(args) {
+                removeSuccess();
+                removeFailed();
+                resolve(args);
+            });
+
+            var removeFailed = me.failed.listen(function(args) {
+                removeSuccess();
+                removeFailed();
+                reject(args);
+            });
+
+            me.triggerAsync.apply(me, args);
+        });
+
+        return promise;
+    },
+};
+
+},{"./utils":"/Users/sahat/Projects/trip-planner/node_modules/reflux/src/utils.js"}],"/Users/sahat/Projects/trip-planner/node_modules/reflux/src/StoreMethods.js":[function(require,module,exports){
+/**
+ * A module of methods that you want to include in all stores.
+ * This module is consumed by `createStore`.
+ */
+module.exports = {
+};
+
+},{}],"/Users/sahat/Projects/trip-planner/node_modules/reflux/src/bindMethods.js":[function(require,module,exports){
+module.exports = function(store, definition) {
+  for (var name in definition) {
+    var property = definition[name];
+
+    if (typeof property !== 'function' || !definition.hasOwnProperty(name)) {
+      continue;
+    }
+
+    store[name] = property.bind(store);
+  }
+
+  return store;
+};
+
+},{}],"/Users/sahat/Projects/trip-planner/node_modules/reflux/src/connect.js":[function(require,module,exports){
+var Reflux = require('./index'),
+    _ = require('./utils');
+
+module.exports = function(listenable,key){
+    return {
+        getInitialState: function(){
+            if (!_.isFunction(listenable.getInitialState)) {
+                return {};
+            } else if (key === undefined) {
+                return listenable.getInitialState();
+            } else {
+                return _.object([key],[listenable.getInitialState()]);
+            }
+        },
+        componentDidMount: function(){
+            _.extend(this,Reflux.ListenerMethods);
+            var me = this, cb = (key === undefined ? this.setState : function(v){me.setState(_.object([key],[v]));});
+            this.listenTo(listenable,cb);
+        },
+        componentWillUnmount: Reflux.ListenerMixin.componentWillUnmount
+    };
+};
+
+},{"./index":"/Users/sahat/Projects/trip-planner/node_modules/reflux/src/index.js","./utils":"/Users/sahat/Projects/trip-planner/node_modules/reflux/src/utils.js"}],"/Users/sahat/Projects/trip-planner/node_modules/reflux/src/connectFilter.js":[function(require,module,exports){
+var Reflux = require('./index'),
+  _ = require('./utils');
+
+module.exports = function(listenable, key, filterFunc) {
+    filterFunc = _.isFunction(key) ? key : filterFunc;
+    return {
+        getInitialState: function() {
+            if (!_.isFunction(listenable.getInitialState)) {
+                return {};
+            } else if (_.isFunction(key)) {
+                return filterFunc.call(this, listenable.getInitialState());
+            } else {
+                // Filter initial payload from store.
+                var result = filterFunc.call(this, listenable.getInitialState());
+                if (result) {
+                  return _.object([key], [result]);
+                } else {
+                  return {};
+                }
+            }
+        },
+        componentDidMount: function() {
+            _.extend(this, Reflux.ListenerMethods);
+            var me = this;
+            var cb = function(value) {
+                if (_.isFunction(key)) {
+                    me.setState(filterFunc.call(me, value));
+                } else {
+                    var result = filterFunc.call(me, value);
+                    me.setState(_.object([key], [result]));
+                }
+            };
+
+            this.listenTo(listenable, cb);
+        },
+        componentWillUnmount: Reflux.ListenerMixin.componentWillUnmount
+    };
+};
+
+
+},{"./index":"/Users/sahat/Projects/trip-planner/node_modules/reflux/src/index.js","./utils":"/Users/sahat/Projects/trip-planner/node_modules/reflux/src/utils.js"}],"/Users/sahat/Projects/trip-planner/node_modules/reflux/src/createAction.js":[function(require,module,exports){
+var _ = require('./utils'),
+    Reflux = require('./index'),
+    Keep = require('./Keep'),
+    allowed = {preEmit:1,shouldEmit:1};
+
+/**
+ * Creates an action functor object. It is mixed in with functions
+ * from the `PublisherMethods` mixin. `preEmit` and `shouldEmit` may
+ * be overridden in the definition object.
+ *
+ * @param {Object} definition The action object definition
+ */
+var createAction = function(definition) {
+
+    definition = definition || {};
+    if (!_.isObject(definition)){
+        definition = {actionName: definition};
+    }
+
+    for(var a in Reflux.ActionMethods){
+        if (!allowed[a] && Reflux.PublisherMethods[a]) {
+            throw new Error("Cannot override API method " + a +
+                " in Reflux.ActionMethods. Use another method name or override it on Reflux.PublisherMethods instead."
+            );
+        }
+    }
+
+    for(var d in definition){
+        if (!allowed[d] && Reflux.PublisherMethods[d]) {
+            throw new Error("Cannot override API method " + d +
+                " in action creation. Use another method name or override it on Reflux.PublisherMethods instead."
+            );
+        }
+    }
+
+    definition.children = definition.children || [];
+    if (definition.asyncResult){
+        definition.children = definition.children.concat(["completed","failed"]);
+    }
+
+    var i = 0, childActions = {};
+    for (; i < definition.children.length; i++) {
+        var name = definition.children[i];
+        childActions[name] = createAction(name);
+    }
+
+    var context = _.extend({
+        eventLabel: "action",
+        emitter: new _.EventEmitter(),
+        _isAction: true
+    }, Reflux.PublisherMethods, Reflux.ActionMethods, definition);
+
+    var functor = function() {
+        functor[functor.sync?"trigger":"triggerAsync"].apply(functor, arguments);
+    };
+
+    _.extend(functor,childActions,context);
+
+    Keep.createdActions.push(functor);
+
+    return functor;
+
+};
+
+module.exports = createAction;
+
+},{"./Keep":"/Users/sahat/Projects/trip-planner/node_modules/reflux/src/Keep.js","./index":"/Users/sahat/Projects/trip-planner/node_modules/reflux/src/index.js","./utils":"/Users/sahat/Projects/trip-planner/node_modules/reflux/src/utils.js"}],"/Users/sahat/Projects/trip-planner/node_modules/reflux/src/createStore.js":[function(require,module,exports){
+var _ = require('./utils'),
+    Reflux = require('./index'),
+    Keep = require('./Keep'),
+    mixer = require('./mixer'),
+    allowed = {preEmit:1,shouldEmit:1},
+    bindMethods = require('./bindMethods');
+
+/**
+ * Creates an event emitting Data Store. It is mixed in with functions
+ * from the `ListenerMethods` and `PublisherMethods` mixins. `preEmit`
+ * and `shouldEmit` may be overridden in the definition object.
+ *
+ * @param {Object} definition The data store object definition
+ * @returns {Store} A data store instance
+ */
+module.exports = function(definition) {
+
+    definition = definition || {};
+
+    for(var a in Reflux.StoreMethods){
+        if (!allowed[a] && (Reflux.PublisherMethods[a] || Reflux.ListenerMethods[a])){
+            throw new Error("Cannot override API method " + a +
+                " in Reflux.StoreMethods. Use another method name or override it on Reflux.PublisherMethods / Reflux.ListenerMethods instead."
+            );
+        }
+    }
+
+    for(var d in definition){
+        if (!allowed[d] && (Reflux.PublisherMethods[d] || Reflux.ListenerMethods[d])){
+            throw new Error("Cannot override API method " + d +
+                " in store creation. Use another method name or override it on Reflux.PublisherMethods / Reflux.ListenerMethods instead."
+            );
+        }
+    }
+
+    definition = mixer(definition);
+
+    function Store() {
+        var i=0, arr;
+        this.subscriptions = [];
+        this.emitter = new _.EventEmitter();
+        this.eventLabel = "change";
+        bindMethods(this, definition);
+        if (this.init && _.isFunction(this.init)) {
+            this.init();
+        }
+        if (this.listenables){
+            arr = [].concat(this.listenables);
+            for(;i < arr.length;i++){
+                this.listenToMany(arr[i]);
+            }
+        }
+    }
+
+    _.extend(Store.prototype, Reflux.ListenerMethods, Reflux.PublisherMethods, Reflux.StoreMethods, definition);
+
+    var store = new Store();
+    Keep.createdStores.push(store);
+
+    return store;
+};
+
+},{"./Keep":"/Users/sahat/Projects/trip-planner/node_modules/reflux/src/Keep.js","./bindMethods":"/Users/sahat/Projects/trip-planner/node_modules/reflux/src/bindMethods.js","./index":"/Users/sahat/Projects/trip-planner/node_modules/reflux/src/index.js","./mixer":"/Users/sahat/Projects/trip-planner/node_modules/reflux/src/mixer.js","./utils":"/Users/sahat/Projects/trip-planner/node_modules/reflux/src/utils.js"}],"/Users/sahat/Projects/trip-planner/node_modules/reflux/src/index.js":[function(require,module,exports){
+exports.ActionMethods = require('./ActionMethods');
+
+exports.ListenerMethods = require('./ListenerMethods');
+
+exports.PublisherMethods = require('./PublisherMethods');
+
+exports.StoreMethods = require('./StoreMethods');
+
+exports.createAction = require('./createAction');
+
+exports.createStore = require('./createStore');
+
+exports.connect = require('./connect');
+
+exports.connectFilter = require('./connectFilter');
+
+exports.ListenerMixin = require('./ListenerMixin');
+
+exports.listenTo = require('./listenTo');
+
+exports.listenToMany = require('./listenToMany');
+
+
+var maker = require('./joins').staticJoinCreator;
+
+exports.joinTrailing = exports.all = maker("last"); // Reflux.all alias for backward compatibility
+
+exports.joinLeading = maker("first");
+
+exports.joinStrict = maker("strict");
+
+exports.joinConcat = maker("all");
+
+var _ = require('./utils');
+
+/**
+ * Convenience function for creating a set of actions
+ *
+ * @param definitions the definitions for the actions to be created
+ * @returns an object with actions of corresponding action names
+ */
+exports.createActions = function(definitions) {
+    var actions = {};
+    for (var k in definitions){
+        var val = definitions[k],
+            actionName = _.isObject(val) ? k : val;
+
+        actions[actionName] = exports.createAction(val);
+    }
+    return actions;
+};
+
+/**
+ * Sets the eventmitter that Reflux uses
+ */
+exports.setEventEmitter = function(ctx) {
+    var _ = require('./utils');
+    _.EventEmitter = ctx;
+};
+
+
+/**
+ * Sets the Promise library that Reflux uses
+ */
+exports.setPromise = function(ctx) {
+    var _ = require('./utils');
+    _.Promise = ctx;
+};
+
+/**
+ * Sets the Promise factory that creates new promises
+ * @param {Function} factory has the signature `function(resolver) { return [new Promise]; }`
+ */
+exports.setPromiseFactory = function(factory) {
+    var _ = require('./utils');
+    _.createPromise = factory;
+};
+
+
+/**
+ * Sets the method used for deferring actions and stores
+ */
+exports.nextTick = function(nextTick) {
+    var _ = require('./utils');
+    _.nextTick = nextTick;
+};
+
+/**
+ * Provides the set of created actions and stores for introspection
+ */
+exports.__keep = require('./Keep');
+
+/**
+ * Warn if Function.prototype.bind not available
+ */
+if (!Function.prototype.bind) {
+  console.error(
+    'Function.prototype.bind not available. ' +
+    'ES5 shim required. ' +
+    'https://github.com/spoike/refluxjs#es5'
+  );
+}
+
+},{"./ActionMethods":"/Users/sahat/Projects/trip-planner/node_modules/reflux/src/ActionMethods.js","./Keep":"/Users/sahat/Projects/trip-planner/node_modules/reflux/src/Keep.js","./ListenerMethods":"/Users/sahat/Projects/trip-planner/node_modules/reflux/src/ListenerMethods.js","./ListenerMixin":"/Users/sahat/Projects/trip-planner/node_modules/reflux/src/ListenerMixin.js","./PublisherMethods":"/Users/sahat/Projects/trip-planner/node_modules/reflux/src/PublisherMethods.js","./StoreMethods":"/Users/sahat/Projects/trip-planner/node_modules/reflux/src/StoreMethods.js","./connect":"/Users/sahat/Projects/trip-planner/node_modules/reflux/src/connect.js","./connectFilter":"/Users/sahat/Projects/trip-planner/node_modules/reflux/src/connectFilter.js","./createAction":"/Users/sahat/Projects/trip-planner/node_modules/reflux/src/createAction.js","./createStore":"/Users/sahat/Projects/trip-planner/node_modules/reflux/src/createStore.js","./joins":"/Users/sahat/Projects/trip-planner/node_modules/reflux/src/joins.js","./listenTo":"/Users/sahat/Projects/trip-planner/node_modules/reflux/src/listenTo.js","./listenToMany":"/Users/sahat/Projects/trip-planner/node_modules/reflux/src/listenToMany.js","./utils":"/Users/sahat/Projects/trip-planner/node_modules/reflux/src/utils.js"}],"/Users/sahat/Projects/trip-planner/node_modules/reflux/src/joins.js":[function(require,module,exports){
+/**
+ * Internal module used to create static and instance join methods
+ */
+
+var slice = Array.prototype.slice,
+    _ = require("./utils"),
+    createStore = require("./createStore"),
+    strategyMethodNames = {
+        strict: "joinStrict",
+        first: "joinLeading",
+        last: "joinTrailing",
+        all: "joinConcat"
+    };
+
+/**
+ * Used in `index.js` to create the static join methods
+ * @param {String} strategy Which strategy to use when tracking listenable trigger arguments
+ * @returns {Function} A static function which returns a store with a join listen on the given listenables using the given strategy
+ */
+exports.staticJoinCreator = function(strategy){
+    return function(/* listenables... */) {
+        var listenables = slice.call(arguments);
+        return createStore({
+            init: function(){
+                this[strategyMethodNames[strategy]].apply(this,listenables.concat("triggerAsync"));
+            }
+        });
+    };
+};
+
+/**
+ * Used in `ListenerMethods.js` to create the instance join methods
+ * @param {String} strategy Which strategy to use when tracking listenable trigger arguments
+ * @returns {Function} An instance method which sets up a join listen on the given listenables using the given strategy
+ */
+exports.instanceJoinCreator = function(strategy){
+    return function(/* listenables..., callback*/){
+        _.throwIf(arguments.length < 3,'Cannot create a join with less than 2 listenables!');
+        var listenables = slice.call(arguments),
+            callback = listenables.pop(),
+            numberOfListenables = listenables.length,
+            join = {
+                numberOfListenables: numberOfListenables,
+                callback: this[callback]||callback,
+                listener: this,
+                strategy: strategy
+            }, i, cancels = [], subobj;
+        for (i = 0; i < numberOfListenables; i++) {
+            _.throwIf(this.validateListening(listenables[i]));
+        }
+        for (i = 0; i < numberOfListenables; i++) {
+            cancels.push(listenables[i].listen(newListener(i,join),this));
+        }
+        reset(join);
+        subobj = {listenable: listenables};
+        subobj.stop = makeStopper(subobj,cancels,this);
+        this.subscriptions = (this.subscriptions || []).concat(subobj);
+        return subobj;
+    };
+};
+
+// ---- internal join functions ----
+
+function makeStopper(subobj,cancels,context){
+    return function() {
+        var i, subs = context.subscriptions,
+            index = (subs ? subs.indexOf(subobj) : -1);
+        _.throwIf(index === -1,'Tried to remove join already gone from subscriptions list!');
+        for(i=0;i < cancels.length; i++){
+            cancels[i]();
+        }
+        subs.splice(index, 1);
+    };
+}
+
+function reset(join) {
+    join.listenablesEmitted = new Array(join.numberOfListenables);
+    join.args = new Array(join.numberOfListenables);
+}
+
+function newListener(i,join) {
+    return function() {
+        var callargs = slice.call(arguments);
+        if (join.listenablesEmitted[i]){
+            switch(join.strategy){
+                case "strict": throw new Error("Strict join failed because listener triggered twice.");
+                case "last": join.args[i] = callargs; break;
+                case "all": join.args[i].push(callargs);
+            }
+        } else {
+            join.listenablesEmitted[i] = true;
+            join.args[i] = (join.strategy==="all"?[callargs]:callargs);
+        }
+        emitIfAllListenablesEmitted(join);
+    };
+}
+
+function emitIfAllListenablesEmitted(join) {
+    for (var i = 0; i < join.numberOfListenables; i++) {
+        if (!join.listenablesEmitted[i]) {
+            return;
+        }
+    }
+    join.callback.apply(join.listener,join.args);
+    reset(join);
+}
+
+},{"./createStore":"/Users/sahat/Projects/trip-planner/node_modules/reflux/src/createStore.js","./utils":"/Users/sahat/Projects/trip-planner/node_modules/reflux/src/utils.js"}],"/Users/sahat/Projects/trip-planner/node_modules/reflux/src/listenTo.js":[function(require,module,exports){
+var Reflux = require('./index');
+
+
+/**
+ * A mixin factory for a React component. Meant as a more convenient way of using the `ListenerMixin`,
+ * without having to manually set listeners in the `componentDidMount` method.
+ *
+ * @param {Action|Store} listenable An Action or Store that should be
+ *  listened to.
+ * @param {Function|String} callback The callback to register as event handler
+ * @param {Function|String} defaultCallback The callback to register as default handler
+ * @returns {Object} An object to be used as a mixin, which sets up the listener for the given listenable.
+ */
+module.exports = function(listenable,callback,initial){
+    return {
+        /**
+         * Set up the mixin before the initial rendering occurs. Import methods from `ListenerMethods`
+         * and then make the call to `listenTo` with the arguments provided to the factory function
+         */
+        componentDidMount: function() {
+            for(var m in Reflux.ListenerMethods){
+                if (this[m] !== Reflux.ListenerMethods[m]){
+                    if (this[m]){
+                        throw "Can't have other property '"+m+"' when using Reflux.listenTo!";
+                    }
+                    this[m] = Reflux.ListenerMethods[m];
+                }
+            }
+            this.listenTo(listenable,callback,initial);
+        },
+        /**
+         * Cleans up all listener previously registered.
+         */
+        componentWillUnmount: Reflux.ListenerMethods.stopListeningToAll
+    };
+};
+
+},{"./index":"/Users/sahat/Projects/trip-planner/node_modules/reflux/src/index.js"}],"/Users/sahat/Projects/trip-planner/node_modules/reflux/src/listenToMany.js":[function(require,module,exports){
+var Reflux = require('./index');
+
+/**
+ * A mixin factory for a React component. Meant as a more convenient way of using the `listenerMixin`,
+ * without having to manually set listeners in the `componentDidMount` method. This version is used
+ * to automatically set up a `listenToMany` call.
+ *
+ * @param {Object} listenables An object of listenables
+ * @returns {Object} An object to be used as a mixin, which sets up the listeners for the given listenables.
+ */
+module.exports = function(listenables){
+    return {
+        /**
+         * Set up the mixin before the initial rendering occurs. Import methods from `ListenerMethods`
+         * and then make the call to `listenTo` with the arguments provided to the factory function
+         */
+        componentDidMount: function() {
+            for(var m in Reflux.ListenerMethods){
+                if (this[m] !== Reflux.ListenerMethods[m]){
+                    if (this[m]){
+                        throw "Can't have other property '"+m+"' when using Reflux.listenToMany!";
+                    }
+                    this[m] = Reflux.ListenerMethods[m];
+                }
+            }
+            this.listenToMany(listenables);
+        },
+        /**
+         * Cleans up all listener previously registered.
+         */
+        componentWillUnmount: Reflux.ListenerMethods.stopListeningToAll
+    };
+};
+
+},{"./index":"/Users/sahat/Projects/trip-planner/node_modules/reflux/src/index.js"}],"/Users/sahat/Projects/trip-planner/node_modules/reflux/src/mixer.js":[function(require,module,exports){
+var _ = require('./utils');
+
+module.exports = function mix(def) {
+    var composed = {
+        init: [],
+        preEmit: [],
+        shouldEmit: []
+    };
+
+    var updated = (function mixDef(mixin) {
+        var mixed = {};
+        if (mixin.mixins) {
+            mixin.mixins.forEach(function (subMixin) {
+                _.extend(mixed, mixDef(subMixin));
+            });
+        }
+        _.extend(mixed, mixin);
+        Object.keys(composed).forEach(function (composable) {
+            if (mixin.hasOwnProperty(composable)) {
+                composed[composable].push(mixin[composable]);
+            }
+        });
+        return mixed;
+    }(def));
+
+    if (composed.init.length > 1) {
+        updated.init = function () {
+            var args = arguments;
+            composed.init.forEach(function (init) {
+                init.apply(this, args);
+            }, this);
+        };
+    }
+    if (composed.preEmit.length > 1) {
+        updated.preEmit = function () {
+            return composed.preEmit.reduce(function (args, preEmit) {
+                var newValue = preEmit.apply(this, args);
+                return newValue === undefined ? args : [newValue];
+            }.bind(this), arguments);
+        };
+    }
+    if (composed.shouldEmit.length > 1) {
+        updated.shouldEmit = function () {
+            var args = arguments;
+            return !composed.shouldEmit.some(function (shouldEmit) {
+                return !shouldEmit.apply(this, args);
+            }, this);
+        };
+    }
+    Object.keys(composed).forEach(function (composable) {
+        if (composed[composable].length === 1) {
+            updated[composable] = composed[composable][0];
+        }
+    });
+
+    return updated;
+};
+
+},{"./utils":"/Users/sahat/Projects/trip-planner/node_modules/reflux/src/utils.js"}],"/Users/sahat/Projects/trip-planner/node_modules/reflux/src/utils.js":[function(require,module,exports){
+/*
+ * isObject, extend, isFunction, isArguments are taken from undescore/lodash in
+ * order to remove the dependency
+ */
+var isObject = exports.isObject = function(obj) {
+    var type = typeof obj;
+    return type === 'function' || type === 'object' && !!obj;
+};
+
+exports.extend = function(obj) {
+    if (!isObject(obj)) {
+        return obj;
+    }
+    var source, prop;
+    for (var i = 1, length = arguments.length; i < length; i++) {
+        source = arguments[i];
+        for (prop in source) {
+            obj[prop] = source[prop];
+        }
+    }
+    return obj;
+};
+
+exports.isFunction = function(value) {
+    return typeof value === 'function';
+};
+
+exports.EventEmitter = require('eventemitter3');
+
+exports.nextTick = function(callback) {
+    setTimeout(callback, 0);
+};
+
+exports.capitalize = function(string){
+    return string.charAt(0).toUpperCase()+string.slice(1);
+};
+
+exports.callbackName = function(string){
+    return "on"+exports.capitalize(string);
+};
+
+exports.object = function(keys,vals){
+    var o={}, i=0;
+    for(;i<keys.length;i++){
+        o[keys[i]] = vals[i];
+    }
+    return o;
+};
+
+exports.Promise = require("native-promise-only");
+
+exports.createPromise = function(resolver) {
+    return new exports.Promise(resolver);
+};
+
+exports.isArguments = function(value) {
+    return typeof value === 'object' && ('callee' in value) && typeof value.length === 'number';
+};
+
+exports.throwIf = function(val,msg){
+    if (val){
+        throw Error(msg||val);
+    }
+};
+
+},{"eventemitter3":"/Users/sahat/Projects/trip-planner/node_modules/reflux/node_modules/eventemitter3/index.js","native-promise-only":"/Users/sahat/Projects/trip-planner/node_modules/reflux/node_modules/native-promise-only/npo.js"}],"/Users/sahat/Projects/trip-planner/node_modules/superagent/lib/client.js":[function(require,module,exports){
+/**
+ * Module dependencies.
+ */
+
+var Emitter = require('emitter');
+var reduce = require('reduce');
+
+/**
+ * Root reference for iframes.
+ */
+
+var root = 'undefined' == typeof window
+  ? this
+  : window;
+
+/**
+ * Noop.
+ */
+
+function noop(){};
+
+/**
+ * Check if `obj` is a host object,
+ * we don't want to serialize these :)
+ *
+ * TODO: future proof, move to compoent land
+ *
+ * @param {Object} obj
+ * @return {Boolean}
+ * @api private
+ */
+
+function isHost(obj) {
+  var str = {}.toString.call(obj);
+
+  switch (str) {
+    case '[object File]':
+    case '[object Blob]':
+    case '[object FormData]':
+      return true;
+    default:
+      return false;
+  }
+}
+
+/**
+ * Determine XHR.
+ */
+
+function getXHR() {
+  if (root.XMLHttpRequest
+    && ('file:' != root.location.protocol || !root.ActiveXObject)) {
+    return new XMLHttpRequest;
+  } else {
+    try { return new ActiveXObject('Microsoft.XMLHTTP'); } catch(e) {}
+    try { return new ActiveXObject('Msxml2.XMLHTTP.6.0'); } catch(e) {}
+    try { return new ActiveXObject('Msxml2.XMLHTTP.3.0'); } catch(e) {}
+    try { return new ActiveXObject('Msxml2.XMLHTTP'); } catch(e) {}
+  }
+  return false;
+}
+
+/**
+ * Removes leading and trailing whitespace, added to support IE.
+ *
+ * @param {String} s
+ * @return {String}
+ * @api private
+ */
+
+var trim = ''.trim
+  ? function(s) { return s.trim(); }
+  : function(s) { return s.replace(/(^\s*|\s*$)/g, ''); };
+
+/**
+ * Check if `obj` is an object.
+ *
+ * @param {Object} obj
+ * @return {Boolean}
+ * @api private
+ */
+
+function isObject(obj) {
+  return obj === Object(obj);
+}
+
+/**
+ * Serialize the given `obj`.
+ *
+ * @param {Object} obj
+ * @return {String}
+ * @api private
+ */
+
+function serialize(obj) {
+  if (!isObject(obj)) return obj;
+  var pairs = [];
+  for (var key in obj) {
+    if (null != obj[key]) {
+      pairs.push(encodeURIComponent(key)
+        + '=' + encodeURIComponent(obj[key]));
+    }
+  }
+  return pairs.join('&');
+}
+
+/**
+ * Expose serialization method.
+ */
+
+ request.serializeObject = serialize;
+
+ /**
+  * Parse the given x-www-form-urlencoded `str`.
+  *
+  * @param {String} str
+  * @return {Object}
+  * @api private
+  */
+
+function parseString(str) {
+  var obj = {};
+  var pairs = str.split('&');
+  var parts;
+  var pair;
+
+  for (var i = 0, len = pairs.length; i < len; ++i) {
+    pair = pairs[i];
+    parts = pair.split('=');
+    obj[decodeURIComponent(parts[0])] = decodeURIComponent(parts[1]);
+  }
+
+  return obj;
+}
+
+/**
+ * Expose parser.
+ */
+
+request.parseString = parseString;
+
+/**
+ * Default MIME type map.
+ *
+ *     superagent.types.xml = 'application/xml';
+ *
+ */
+
+request.types = {
+  html: 'text/html',
+  json: 'application/json',
+  xml: 'application/xml',
+  urlencoded: 'application/x-www-form-urlencoded',
+  'form': 'application/x-www-form-urlencoded',
+  'form-data': 'application/x-www-form-urlencoded'
+};
+
+/**
+ * Default serialization map.
+ *
+ *     superagent.serialize['application/xml'] = function(obj){
+ *       return 'generated xml here';
+ *     };
+ *
+ */
+
+ request.serialize = {
+   'application/x-www-form-urlencoded': serialize,
+   'application/json': JSON.stringify
+ };
+
+ /**
+  * Default parsers.
+  *
+  *     superagent.parse['application/xml'] = function(str){
+  *       return { object parsed from str };
+  *     };
+  *
+  */
+
+request.parse = {
+  'application/x-www-form-urlencoded': parseString,
+  'application/json': JSON.parse
+};
+
+/**
+ * Parse the given header `str` into
+ * an object containing the mapped fields.
+ *
+ * @param {String} str
+ * @return {Object}
+ * @api private
+ */
+
+function parseHeader(str) {
+  var lines = str.split(/\r?\n/);
+  var fields = {};
+  var index;
+  var line;
+  var field;
+  var val;
+
+  lines.pop(); // trailing CRLF
+
+  for (var i = 0, len = lines.length; i < len; ++i) {
+    line = lines[i];
+    index = line.indexOf(':');
+    field = line.slice(0, index).toLowerCase();
+    val = trim(line.slice(index + 1));
+    fields[field] = val;
+  }
+
+  return fields;
+}
+
+/**
+ * Return the mime type for the given `str`.
+ *
+ * @param {String} str
+ * @return {String}
+ * @api private
+ */
+
+function type(str){
+  return str.split(/ *; */).shift();
+};
+
+/**
+ * Return header field parameters.
+ *
+ * @param {String} str
+ * @return {Object}
+ * @api private
+ */
+
+function params(str){
+  return reduce(str.split(/ *; */), function(obj, str){
+    var parts = str.split(/ *= */)
+      , key = parts.shift()
+      , val = parts.shift();
+
+    if (key && val) obj[key] = val;
+    return obj;
+  }, {});
+};
+
+/**
+ * Initialize a new `Response` with the given `xhr`.
+ *
+ *  - set flags (.ok, .error, etc)
+ *  - parse header
+ *
+ * Examples:
+ *
+ *  Aliasing `superagent` as `request` is nice:
+ *
+ *      request = superagent;
+ *
+ *  We can use the promise-like API, or pass callbacks:
+ *
+ *      request.get('/').end(function(res){});
+ *      request.get('/', function(res){});
+ *
+ *  Sending data can be chained:
+ *
+ *      request
+ *        .post('/user')
+ *        .send({ name: 'tj' })
+ *        .end(function(res){});
+ *
+ *  Or passed to `.send()`:
+ *
+ *      request
+ *        .post('/user')
+ *        .send({ name: 'tj' }, function(res){});
+ *
+ *  Or passed to `.post()`:
+ *
+ *      request
+ *        .post('/user', { name: 'tj' })
+ *        .end(function(res){});
+ *
+ * Or further reduced to a single call for simple cases:
+ *
+ *      request
+ *        .post('/user', { name: 'tj' }, function(res){});
+ *
+ * @param {XMLHTTPRequest} xhr
+ * @param {Object} options
+ * @api private
+ */
+
+function Response(req, options) {
+  options = options || {};
+  this.req = req;
+  this.xhr = this.req.xhr;
+  this.text = this.req.method !='HEAD' 
+     ? this.xhr.responseText 
+     : null;
+  this.setStatusProperties(this.xhr.status);
+  this.header = this.headers = parseHeader(this.xhr.getAllResponseHeaders());
+  // getAllResponseHeaders sometimes falsely returns "" for CORS requests, but
+  // getResponseHeader still works. so we get content-type even if getting
+  // other headers fails.
+  this.header['content-type'] = this.xhr.getResponseHeader('content-type');
+  this.setHeaderProperties(this.header);
+  this.body = this.req.method != 'HEAD'
+    ? this.parseBody(this.text)
+    : null;
+}
+
+/**
+ * Get case-insensitive `field` value.
+ *
+ * @param {String} field
+ * @return {String}
+ * @api public
+ */
+
+Response.prototype.get = function(field){
+  return this.header[field.toLowerCase()];
+};
+
+/**
+ * Set header related properties:
+ *
+ *   - `.type` the content type without params
+ *
+ * A response of "Content-Type: text/plain; charset=utf-8"
+ * will provide you with a `.type` of "text/plain".
+ *
+ * @param {Object} header
+ * @api private
+ */
+
+Response.prototype.setHeaderProperties = function(header){
+  // content-type
+  var ct = this.header['content-type'] || '';
+  this.type = type(ct);
+
+  // params
+  var obj = params(ct);
+  for (var key in obj) this[key] = obj[key];
+};
+
+/**
+ * Parse the given body `str`.
+ *
+ * Used for auto-parsing of bodies. Parsers
+ * are defined on the `superagent.parse` object.
+ *
+ * @param {String} str
+ * @return {Mixed}
+ * @api private
+ */
+
+Response.prototype.parseBody = function(str){
+  var parse = request.parse[this.type];
+  return parse && str && str.length
+    ? parse(str)
+    : null;
+};
+
+/**
+ * Set flags such as `.ok` based on `status`.
+ *
+ * For example a 2xx response will give you a `.ok` of __true__
+ * whereas 5xx will be __false__ and `.error` will be __true__. The
+ * `.clientError` and `.serverError` are also available to be more
+ * specific, and `.statusType` is the class of error ranging from 1..5
+ * sometimes useful for mapping respond colors etc.
+ *
+ * "sugar" properties are also defined for common cases. Currently providing:
+ *
+ *   - .noContent
+ *   - .badRequest
+ *   - .unauthorized
+ *   - .notAcceptable
+ *   - .notFound
+ *
+ * @param {Number} status
+ * @api private
+ */
+
+Response.prototype.setStatusProperties = function(status){
+  var type = status / 100 | 0;
+
+  // status / class
+  this.status = status;
+  this.statusType = type;
+
+  // basics
+  this.info = 1 == type;
+  this.ok = 2 == type;
+  this.clientError = 4 == type;
+  this.serverError = 5 == type;
+  this.error = (4 == type || 5 == type)
+    ? this.toError()
+    : false;
+
+  // sugar
+  this.accepted = 202 == status;
+  this.noContent = 204 == status || 1223 == status;
+  this.badRequest = 400 == status;
+  this.unauthorized = 401 == status;
+  this.notAcceptable = 406 == status;
+  this.notFound = 404 == status;
+  this.forbidden = 403 == status;
+};
+
+/**
+ * Return an `Error` representative of this response.
+ *
+ * @return {Error}
+ * @api public
+ */
+
+Response.prototype.toError = function(){
+  var req = this.req;
+  var method = req.method;
+  var url = req.url;
+
+  var msg = 'cannot ' + method + ' ' + url + ' (' + this.status + ')';
+  var err = new Error(msg);
+  err.status = this.status;
+  err.method = method;
+  err.url = url;
+
+  return err;
+};
+
+/**
+ * Expose `Response`.
+ */
+
+request.Response = Response;
+
+/**
+ * Initialize a new `Request` with the given `method` and `url`.
+ *
+ * @param {String} method
+ * @param {String} url
+ * @api public
+ */
+
+function Request(method, url) {
+  var self = this;
+  Emitter.call(this);
+  this._query = this._query || [];
+  this.method = method;
+  this.url = url;
+  this.header = {};
+  this._header = {};
+  this.on('end', function(){
+    var err = null;
+    var res = null;
+
+    try {
+      res = new Response(self); 
+    } catch(e) {
+      err = new Error('Parser is unable to parse the response');
+      err.parse = true;
+      err.original = e;
+    }
+
+    self.callback(err, res);
+  });
+}
+
+/**
+ * Mixin `Emitter`.
+ */
+
+Emitter(Request.prototype);
+
+/**
+ * Allow for extension
+ */
+
+Request.prototype.use = function(fn) {
+  fn(this);
+  return this;
+}
+
+/**
+ * Set timeout to `ms`.
+ *
+ * @param {Number} ms
+ * @return {Request} for chaining
+ * @api public
+ */
+
+Request.prototype.timeout = function(ms){
+  this._timeout = ms;
+  return this;
+};
+
+/**
+ * Clear previous timeout.
+ *
+ * @return {Request} for chaining
+ * @api public
+ */
+
+Request.prototype.clearTimeout = function(){
+  this._timeout = 0;
+  clearTimeout(this._timer);
+  return this;
+};
+
+/**
+ * Abort the request, and clear potential timeout.
+ *
+ * @return {Request}
+ * @api public
+ */
+
+Request.prototype.abort = function(){
+  if (this.aborted) return;
+  this.aborted = true;
+  this.xhr.abort();
+  this.clearTimeout();
+  this.emit('abort');
+  return this;
+};
+
+/**
+ * Set header `field` to `val`, or multiple fields with one object.
+ *
+ * Examples:
+ *
+ *      req.get('/')
+ *        .set('Accept', 'application/json')
+ *        .set('X-API-Key', 'foobar')
+ *        .end(callback);
+ *
+ *      req.get('/')
+ *        .set({ Accept: 'application/json', 'X-API-Key': 'foobar' })
+ *        .end(callback);
+ *
+ * @param {String|Object} field
+ * @param {String} val
+ * @return {Request} for chaining
+ * @api public
+ */
+
+Request.prototype.set = function(field, val){
+  if (isObject(field)) {
+    for (var key in field) {
+      this.set(key, field[key]);
+    }
+    return this;
+  }
+  this._header[field.toLowerCase()] = val;
+  this.header[field] = val;
+  return this;
+};
+
+/**
+ * Remove header `field`.
+ *
+ * Example:
+ *
+ *      req.get('/')
+ *        .unset('User-Agent')
+ *        .end(callback);
+ *
+ * @param {String} field
+ * @return {Request} for chaining
+ * @api public
+ */
+
+Request.prototype.unset = function(field){
+  delete this._header[field.toLowerCase()];
+  delete this.header[field];
+  return this;
+};
+
+/**
+ * Get case-insensitive header `field` value.
+ *
+ * @param {String} field
+ * @return {String}
+ * @api private
+ */
+
+Request.prototype.getHeader = function(field){
+  return this._header[field.toLowerCase()];
+};
+
+/**
+ * Set Content-Type to `type`, mapping values from `request.types`.
+ *
+ * Examples:
+ *
+ *      superagent.types.xml = 'application/xml';
+ *
+ *      request.post('/')
+ *        .type('xml')
+ *        .send(xmlstring)
+ *        .end(callback);
+ *
+ *      request.post('/')
+ *        .type('application/xml')
+ *        .send(xmlstring)
+ *        .end(callback);
+ *
+ * @param {String} type
+ * @return {Request} for chaining
+ * @api public
+ */
+
+Request.prototype.type = function(type){
+  this.set('Content-Type', request.types[type] || type);
+  return this;
+};
+
+/**
+ * Set Accept to `type`, mapping values from `request.types`.
+ *
+ * Examples:
+ *
+ *      superagent.types.json = 'application/json';
+ *
+ *      request.get('/agent')
+ *        .accept('json')
+ *        .end(callback);
+ *
+ *      request.get('/agent')
+ *        .accept('application/json')
+ *        .end(callback);
+ *
+ * @param {String} accept
+ * @return {Request} for chaining
+ * @api public
+ */
+
+Request.prototype.accept = function(type){
+  this.set('Accept', request.types[type] || type);
+  return this;
+};
+
+/**
+ * Set Authorization field value with `user` and `pass`.
+ *
+ * @param {String} user
+ * @param {String} pass
+ * @return {Request} for chaining
+ * @api public
+ */
+
+Request.prototype.auth = function(user, pass){
+  var str = btoa(user + ':' + pass);
+  this.set('Authorization', 'Basic ' + str);
+  return this;
+};
+
+/**
+* Add query-string `val`.
+*
+* Examples:
+*
+*   request.get('/shoes')
+*     .query('size=10')
+*     .query({ color: 'blue' })
+*
+* @param {Object|String} val
+* @return {Request} for chaining
+* @api public
+*/
+
+Request.prototype.query = function(val){
+  if ('string' != typeof val) val = serialize(val);
+  if (val) this._query.push(val);
+  return this;
+};
+
+/**
+ * Write the field `name` and `val` for "multipart/form-data"
+ * request bodies.
+ *
+ * ``` js
+ * request.post('/upload')
+ *   .field('foo', 'bar')
+ *   .end(callback);
+ * ```
+ *
+ * @param {String} name
+ * @param {String|Blob|File} val
+ * @return {Request} for chaining
+ * @api public
+ */
+
+Request.prototype.field = function(name, val){
+  if (!this._formData) this._formData = new FormData();
+  this._formData.append(name, val);
+  return this;
+};
+
+/**
+ * Queue the given `file` as an attachment to the specified `field`,
+ * with optional `filename`.
+ *
+ * ``` js
+ * request.post('/upload')
+ *   .attach(new Blob(['<a id="a"><b id="b">hey!</b></a>'], { type: "text/html"}))
+ *   .end(callback);
+ * ```
+ *
+ * @param {String} field
+ * @param {Blob|File} file
+ * @param {String} filename
+ * @return {Request} for chaining
+ * @api public
+ */
+
+Request.prototype.attach = function(field, file, filename){
+  if (!this._formData) this._formData = new FormData();
+  this._formData.append(field, file, filename);
+  return this;
+};
+
+/**
+ * Send `data`, defaulting the `.type()` to "json" when
+ * an object is given.
+ *
+ * Examples:
+ *
+ *       // querystring
+ *       request.get('/search')
+ *         .end(callback)
+ *
+ *       // multiple data "writes"
+ *       request.get('/search')
+ *         .send({ search: 'query' })
+ *         .send({ range: '1..5' })
+ *         .send({ order: 'desc' })
+ *         .end(callback)
+ *
+ *       // manual json
+ *       request.post('/user')
+ *         .type('json')
+ *         .send('{"name":"tj"})
+ *         .end(callback)
+ *
+ *       // auto json
+ *       request.post('/user')
+ *         .send({ name: 'tj' })
+ *         .end(callback)
+ *
+ *       // manual x-www-form-urlencoded
+ *       request.post('/user')
+ *         .type('form')
+ *         .send('name=tj')
+ *         .end(callback)
+ *
+ *       // auto x-www-form-urlencoded
+ *       request.post('/user')
+ *         .type('form')
+ *         .send({ name: 'tj' })
+ *         .end(callback)
+ *
+ *       // defaults to x-www-form-urlencoded
+  *      request.post('/user')
+  *        .send('name=tobi')
+  *        .send('species=ferret')
+  *        .end(callback)
+ *
+ * @param {String|Object} data
+ * @return {Request} for chaining
+ * @api public
+ */
+
+Request.prototype.send = function(data){
+  var obj = isObject(data);
+  var type = this.getHeader('Content-Type');
+
+  // merge
+  if (obj && isObject(this._data)) {
+    for (var key in data) {
+      this._data[key] = data[key];
+    }
+  } else if ('string' == typeof data) {
+    if (!type) this.type('form');
+    type = this.getHeader('Content-Type');
+    if ('application/x-www-form-urlencoded' == type) {
+      this._data = this._data
+        ? this._data + '&' + data
+        : data;
+    } else {
+      this._data = (this._data || '') + data;
+    }
+  } else {
+    this._data = data;
+  }
+
+  if (!obj) return this;
+  if (!type) this.type('json');
+  return this;
+};
+
+/**
+ * Invoke the callback with `err` and `res`
+ * and handle arity check.
+ *
+ * @param {Error} err
+ * @param {Response} res
+ * @api private
+ */
+
+Request.prototype.callback = function(err, res){
+  var fn = this._callback;
+  this.clearTimeout();
+  if (2 == fn.length) return fn(err, res);
+  if (err) return this.emit('error', err);
+  fn(res);
+};
+
+/**
+ * Invoke callback with x-domain error.
+ *
+ * @api private
+ */
+
+Request.prototype.crossDomainError = function(){
+  var err = new Error('Origin is not allowed by Access-Control-Allow-Origin');
+  err.crossDomain = true;
+  this.callback(err);
+};
+
+/**
+ * Invoke callback with timeout error.
+ *
+ * @api private
+ */
+
+Request.prototype.timeoutError = function(){
+  var timeout = this._timeout;
+  var err = new Error('timeout of ' + timeout + 'ms exceeded');
+  err.timeout = timeout;
+  this.callback(err);
+};
+
+/**
+ * Enable transmission of cookies with x-domain requests.
+ *
+ * Note that for this to work the origin must not be
+ * using "Access-Control-Allow-Origin" with a wildcard,
+ * and also must set "Access-Control-Allow-Credentials"
+ * to "true".
+ *
+ * @api public
+ */
+
+Request.prototype.withCredentials = function(){
+  this._withCredentials = true;
+  return this;
+};
+
+/**
+ * Initiate request, invoking callback `fn(res)`
+ * with an instanceof `Response`.
+ *
+ * @param {Function} fn
+ * @return {Request} for chaining
+ * @api public
+ */
+
+Request.prototype.end = function(fn){
+  var self = this;
+  var xhr = this.xhr = getXHR();
+  var query = this._query.join('&');
+  var timeout = this._timeout;
+  var data = this._formData || this._data;
+
+  // store callback
+  this._callback = fn || noop;
+
+  // state change
+  xhr.onreadystatechange = function(){
+    if (4 != xhr.readyState) return;
+    if (0 == xhr.status) {
+      if (self.aborted) return self.timeoutError();
+      return self.crossDomainError();
+    }
+    self.emit('end');
+  };
+
+  // progress
+  if (xhr.upload) {
+    xhr.upload.onprogress = function(e){
+      e.percent = e.loaded / e.total * 100;
+      self.emit('progress', e);
+    };
+  }
+
+  // timeout
+  if (timeout && !this._timer) {
+    this._timer = setTimeout(function(){
+      self.abort();
+    }, timeout);
+  }
+
+  // querystring
+  if (query) {
+    query = request.serializeObject(query);
+    this.url += ~this.url.indexOf('?')
+      ? '&' + query
+      : '?' + query;
+  }
+
+  // initiate request
+  xhr.open(this.method, this.url, true);
+
+  // CORS
+  if (this._withCredentials) xhr.withCredentials = true;
+
+  // body
+  if ('GET' != this.method && 'HEAD' != this.method && 'string' != typeof data && !isHost(data)) {
+    // serialize stuff
+    var serialize = request.serialize[this.getHeader('Content-Type')];
+    if (serialize) data = serialize(data);
+  }
+
+  // set header fields
+  for (var field in this.header) {
+    if (null == this.header[field]) continue;
+    xhr.setRequestHeader(field, this.header[field]);
+  }
+
+  // send stuff
+  this.emit('request', this);
+  xhr.send(data);
+  return this;
+};
+
+/**
+ * Expose `Request`.
+ */
+
+request.Request = Request;
+
+/**
+ * Issue a request:
+ *
+ * Examples:
+ *
+ *    request('GET', '/users').end(callback)
+ *    request('/users').end(callback)
+ *    request('/users', callback)
+ *
+ * @param {String} method
+ * @param {String|Function} url or callback
+ * @return {Request}
+ * @api public
+ */
+
+function request(method, url) {
+  // callback
+  if ('function' == typeof url) {
+    return new Request('GET', method).end(url);
+  }
+
+  // url first
+  if (1 == arguments.length) {
+    return new Request('GET', method);
+  }
+
+  return new Request(method, url);
+}
+
+/**
+ * GET `url` with optional callback `fn(res)`.
+ *
+ * @param {String} url
+ * @param {Mixed|Function} data or fn
+ * @param {Function} fn
+ * @return {Request}
+ * @api public
+ */
+
+request.get = function(url, data, fn){
+  var req = request('GET', url);
+  if ('function' == typeof data) fn = data, data = null;
+  if (data) req.query(data);
+  if (fn) req.end(fn);
+  return req;
+};
+
+/**
+ * HEAD `url` with optional callback `fn(res)`.
+ *
+ * @param {String} url
+ * @param {Mixed|Function} data or fn
+ * @param {Function} fn
+ * @return {Request}
+ * @api public
+ */
+
+request.head = function(url, data, fn){
+  var req = request('HEAD', url);
+  if ('function' == typeof data) fn = data, data = null;
+  if (data) req.send(data);
+  if (fn) req.end(fn);
+  return req;
+};
+
+/**
+ * DELETE `url` with optional callback `fn(res)`.
+ *
+ * @param {String} url
+ * @param {Function} fn
+ * @return {Request}
+ * @api public
+ */
+
+request.del = function(url, fn){
+  var req = request('DELETE', url);
+  if (fn) req.end(fn);
+  return req;
+};
+
+/**
+ * PATCH `url` with optional `data` and callback `fn(res)`.
+ *
+ * @param {String} url
+ * @param {Mixed} data
+ * @param {Function} fn
+ * @return {Request}
+ * @api public
+ */
+
+request.patch = function(url, data, fn){
+  var req = request('PATCH', url);
+  if ('function' == typeof data) fn = data, data = null;
+  if (data) req.send(data);
+  if (fn) req.end(fn);
+  return req;
+};
+
+/**
+ * POST `url` with optional `data` and callback `fn(res)`.
+ *
+ * @param {String} url
+ * @param {Mixed} data
+ * @param {Function} fn
+ * @return {Request}
+ * @api public
+ */
+
+request.post = function(url, data, fn){
+  var req = request('POST', url);
+  if ('function' == typeof data) fn = data, data = null;
+  if (data) req.send(data);
+  if (fn) req.end(fn);
+  return req;
+};
+
+/**
+ * PUT `url` with optional `data` and callback `fn(res)`.
+ *
+ * @param {String} url
+ * @param {Mixed|Function} data or fn
+ * @param {Function} fn
+ * @return {Request}
+ * @api public
+ */
+
+request.put = function(url, data, fn){
+  var req = request('PUT', url);
+  if ('function' == typeof data) fn = data, data = null;
+  if (data) req.send(data);
+  if (fn) req.end(fn);
+  return req;
+};
+
+/**
+ * Expose `request`.
+ */
+
+module.exports = request;
+
+},{"emitter":"/Users/sahat/Projects/trip-planner/node_modules/superagent/node_modules/component-emitter/index.js","reduce":"/Users/sahat/Projects/trip-planner/node_modules/superagent/node_modules/reduce-component/index.js"}],"/Users/sahat/Projects/trip-planner/node_modules/superagent/node_modules/component-emitter/index.js":[function(require,module,exports){
+
+/**
+ * Expose `Emitter`.
+ */
+
+module.exports = Emitter;
+
+/**
+ * Initialize a new `Emitter`.
+ *
+ * @api public
+ */
+
+function Emitter(obj) {
+  if (obj) return mixin(obj);
+};
+
+/**
+ * Mixin the emitter properties.
+ *
+ * @param {Object} obj
+ * @return {Object}
+ * @api private
+ */
+
+function mixin(obj) {
+  for (var key in Emitter.prototype) {
+    obj[key] = Emitter.prototype[key];
+  }
+  return obj;
+}
+
+/**
+ * Listen on the given `event` with `fn`.
+ *
+ * @param {String} event
+ * @param {Function} fn
+ * @return {Emitter}
+ * @api public
+ */
+
+Emitter.prototype.on =
+Emitter.prototype.addEventListener = function(event, fn){
+  this._callbacks = this._callbacks || {};
+  (this._callbacks[event] = this._callbacks[event] || [])
+    .push(fn);
+  return this;
+};
+
+/**
+ * Adds an `event` listener that will be invoked a single
+ * time then automatically removed.
+ *
+ * @param {String} event
+ * @param {Function} fn
+ * @return {Emitter}
+ * @api public
+ */
+
+Emitter.prototype.once = function(event, fn){
+  var self = this;
+  this._callbacks = this._callbacks || {};
+
+  function on() {
+    self.off(event, on);
+    fn.apply(this, arguments);
+  }
+
+  on.fn = fn;
+  this.on(event, on);
+  return this;
+};
+
+/**
+ * Remove the given callback for `event` or all
+ * registered callbacks.
+ *
+ * @param {String} event
+ * @param {Function} fn
+ * @return {Emitter}
+ * @api public
+ */
+
+Emitter.prototype.off =
+Emitter.prototype.removeListener =
+Emitter.prototype.removeAllListeners =
+Emitter.prototype.removeEventListener = function(event, fn){
+  this._callbacks = this._callbacks || {};
+
+  // all
+  if (0 == arguments.length) {
+    this._callbacks = {};
+    return this;
+  }
+
+  // specific event
+  var callbacks = this._callbacks[event];
+  if (!callbacks) return this;
+
+  // remove all handlers
+  if (1 == arguments.length) {
+    delete this._callbacks[event];
+    return this;
+  }
+
+  // remove specific handler
+  var cb;
+  for (var i = 0; i < callbacks.length; i++) {
+    cb = callbacks[i];
+    if (cb === fn || cb.fn === fn) {
+      callbacks.splice(i, 1);
+      break;
+    }
+  }
+  return this;
+};
+
+/**
+ * Emit `event` with the given args.
+ *
+ * @param {String} event
+ * @param {Mixed} ...
+ * @return {Emitter}
+ */
+
+Emitter.prototype.emit = function(event){
+  this._callbacks = this._callbacks || {};
+  var args = [].slice.call(arguments, 1)
+    , callbacks = this._callbacks[event];
+
+  if (callbacks) {
+    callbacks = callbacks.slice(0);
+    for (var i = 0, len = callbacks.length; i < len; ++i) {
+      callbacks[i].apply(this, args);
+    }
+  }
+
+  return this;
+};
+
+/**
+ * Return array of callbacks for `event`.
+ *
+ * @param {String} event
+ * @return {Array}
+ * @api public
+ */
+
+Emitter.prototype.listeners = function(event){
+  this._callbacks = this._callbacks || {};
+  return this._callbacks[event] || [];
+};
+
+/**
+ * Check if this emitter has `event` handlers.
+ *
+ * @param {String} event
+ * @return {Boolean}
+ * @api public
+ */
+
+Emitter.prototype.hasListeners = function(event){
+  return !! this.listeners(event).length;
+};
+
+},{}],"/Users/sahat/Projects/trip-planner/node_modules/superagent/node_modules/reduce-component/index.js":[function(require,module,exports){
+
+/**
+ * Reduce `arr` with `fn`.
+ *
+ * @param {Array} arr
+ * @param {Function} fn
+ * @param {Mixed} initial
+ *
+ * TODO: combatible error handling?
+ */
+
+module.exports = function(arr, fn, initial){  
+  var idx = 0;
+  var len = arr.length;
+  var curr = arguments.length == 3
+    ? initial
+    : arr[idx++];
+
+  while (idx < len) {
+    curr = fn.call(null, curr, arr[idx], ++idx, arr);
+  }
+  
+  return curr;
+};
+},{}]},{},["./client/main.js"]);
