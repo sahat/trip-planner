@@ -30,7 +30,8 @@ gulp.task('browserify', function() {
   bundler.transform(reactify);
   bundler.on('update', rebundle);
   function rebundle() {
-    return bundler.bundle()
+    return plumber()
+      .pipe(bundler.bundle())
       .pipe(source('bundle.js'))
       .pipe(gulp.dest('./public/js'))
       .pipe(reload({ stream: true }));
