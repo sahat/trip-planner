@@ -15,7 +15,6 @@ var App = React.createClass({
             <li><a href=''>Login</a></li>
           </ul>
         </nav>
-        <Directions />
         <Maps zoom={10} />
       </div>
     );

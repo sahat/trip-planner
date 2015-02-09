@@ -2,6 +2,7 @@ var React = require('react');
 var Reflux = require('reflux');
 var AppStore = require('../stores/AppStore');
 var AppActions = require('../actions/AppActions');
+var Directions = require('./Directions.jsx');
 
 var Maps = React.createClass({
 
@@ -35,8 +36,7 @@ var Maps = React.createClass({
       scaleControl: true
     };
 
-    var map = new google.maps.Map(this.getDOMNode(), mapOptions);
-
+    var map = new google.maps.Map(this.refs.map.getDOMNode(), mapOptions);
 
     this.setState({ map: map });
   },
@@ -67,7 +67,12 @@ var Maps = React.createClass({
   },
 
   render() {
-    return <div className='map'></div>;
+    return (
+      <div className='map'>
+        <Directions map={this.state.map} />
+        <div className='map' ref='map'></div>
+      </div>
+    );
   }
 
 });
