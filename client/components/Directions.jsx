@@ -5,8 +5,14 @@ var AppActions = require('../actions/AppActions');
 
 var Directions = React.createClass({
 
+  mixins: [Reflux.connect(AppStore)],
+
   onGetDirections() {
-    console.log('click')
+    AppActions.getDirections({
+      start: this.refs.start.getDOMNode().value,
+      end: this.refs.end.getDOMNode().value,
+      map: this.props.map
+    });
   },
 
   render() {
@@ -14,12 +20,12 @@ var Directions = React.createClass({
       <div className='directions-overlay'>
         <div className='directions'>
           <div className='start'>
-            <input type='text' className='start' placeholder='Start' />
+            <input type='text' ref='start' className='start' placeholder='Start' />
             <i className='ion-pinpoint'></i>
           </div>
           <hr/>
           <div className='start'>
-            <input type='text' placeholder='End' />
+            <input type='text' ref='end' placeholder='End' />
             <i className='ion-model-s'></i>
           </div>
         </div>

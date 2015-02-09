@@ -10,7 +10,8 @@ var request = require('superagent');
 
 var AppActions = Reflux.createActions({
   loadSuperchargers: { asyncResult: true },
-  getCurrentPosition: { asyncResult: true }
+  getCurrentPosition: { asyncResult: true },
+  getDirections: { asyncResult: true }
 });
 
 AppActions.loadSuperchargers.preEmit = function() {
@@ -37,7 +38,6 @@ var App = React.createClass({displayName: "App",
             React.createElement("li", null, React.createElement("a", {href: ""}, "Login"))
           )
         ), 
-        React.createElement(Directions, null), 
         React.createElement(Maps, {zoom: 10})
       )
     );
@@ -55,23 +55,31 @@ var AppActions = require('../actions/AppActions');
 
 var Directions = React.createClass({displayName: "Directions",
 
+  mixins: [Reflux.connect(AppStore)],
+
+  onGetDirections:function() {
+    AppActions.getDirections({
+      start: this.refs.start.getDOMNode().value,
+      end: this.refs.end.getDOMNode().value,
+      map: this.props.map
+    });
+  },
+
   render:function() {
     return (
-
-
       React.createElement("div", {className: "directions-overlay"}, 
         React.createElement("div", {className: "directions"}, 
           React.createElement("div", {className: "start"}, 
-            React.createElement("input", {type: "text", className: "start", placeholder: "Start"}), 
+            React.createElement("input", {type: "text", ref: "start", className: "start", placeholder: "Start"}), 
             React.createElement("i", {className: "ion-pinpoint"})
           ), 
           React.createElement("hr", null), 
           React.createElement("div", {className: "start"}, 
-            React.createElement("input", {type: "text", placeholder: "End"}), 
+            React.createElement("input", {type: "text", ref: "end", placeholder: "End"}), 
             React.createElement("i", {className: "ion-model-s"})
           )
         ), 
-        React.createElement("button", {className: "swap"}, 
+        React.createElement("button", {className: "swap", onClick: this.onGetDirections}, 
           React.createElement("i", {className: "ion-android-send"})
         ), 
         React.createElement("button", {className: "get-directions"}, "Type, Options, Current Charge")
@@ -88,6 +96,7 @@ var React = require('react');
 var Reflux = require('reflux');
 var AppStore = require('../stores/AppStore');
 var AppActions = require('../actions/AppActions');
+var Directions = require('./Directions.jsx');
 
 var Maps = React.createClass({displayName: "Maps",
 
@@ -121,8 +130,7 @@ var Maps = React.createClass({displayName: "Maps",
       scaleControl: true
     };
 
-    var map = new google.maps.Map(this.getDOMNode(), mapOptions);
-
+    var map = new google.maps.Map(this.refs.map.getDOMNode(), mapOptions);
 
     this.setState({ map: map });
   },
@@ -153,26 +161,62 @@ var Maps = React.createClass({displayName: "Maps",
   },
 
   render:function() {
-    return React.createElement("div", {className: "map"});
+    return (
+      React.createElement("div", {className: "map"}, 
+        React.createElement(Directions, {map: this.state.map}), 
+        React.createElement("div", {className: "map", ref: "map"})
+      )
+    );
   }
 
 });
 
 module.exports = Maps;
 
-},{"../actions/AppActions":"/Users/sahat/Projects/trip-planner/client/actions/AppActions.js","../stores/AppStore":"/Users/sahat/Projects/trip-planner/client/stores/AppStore.js","react":"/Users/sahat/Projects/trip-planner/node_modules/react/react.js","reflux":"/Users/sahat/Projects/trip-planner/node_modules/reflux/index.js"}],"/Users/sahat/Projects/trip-planner/client/stores/AppStore.js":[function(require,module,exports){
+},{"../actions/AppActions":"/Users/sahat/Projects/trip-planner/client/actions/AppActions.js","../stores/AppStore":"/Users/sahat/Projects/trip-planner/client/stores/AppStore.js","./Directions.jsx":"/Users/sahat/Projects/trip-planner/client/components/Directions.jsx","react":"/Users/sahat/Projects/trip-planner/node_modules/react/react.js","reflux":"/Users/sahat/Projects/trip-planner/node_modules/reflux/index.js"}],"/Users/sahat/Projects/trip-planner/client/stores/AppStore.js":[function(require,module,exports){
 var request = require('superagent');
 var Reflux = require('reflux');
 var AppActions = require('../actions/AppActions');
+
+var map;
 
 var AppStore = Reflux.createStore({
 
   listenables: AppActions,
 
+  getMapInstance:function() {
+    console.log(' getting map' , map);
+    return map;
+  },
+
+  saveMapInstance:function(newMap) {
+    console.log('saving map');
+    map = newMap;
+  },
+
   loadSuperchargers:function() {
     request.get('http://localhost:5000/superchargers', function(res) {
       var superchargers = JSON.parse(res.text);
       this.trigger({ superchargers: superchargers });
+    }.bind(this));
+  },
+
+  getDirections:function(data) {
+    var directionsService = new google.maps.DirectionsService();
+    var directionsDisplay = new google.maps.DirectionsRenderer();
+
+    directionsDisplay.setMap(data.map);
+
+    var request = {
+      origin: data.start,
+      destination: data.end,
+      travelMode: google.maps.TravelMode.DRIVING
+    };
+
+    directionsService.route(request, function(result, status) {
+      if (status == google.maps.DirectionsStatus.OK) {
+        directionsDisplay.setDirections(result);
+      }
     }.bind(this));
   },
 
