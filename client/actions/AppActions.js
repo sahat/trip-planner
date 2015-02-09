@@ -3,7 +3,8 @@ var request = require('superagent');
 
 var AppActions = Reflux.createActions({
   loadSuperchargers: { asyncResult: true },
-  getCurrentPosition: { asyncResult: true }
+  getCurrentPosition: { asyncResult: true },
+  getDirections: { asyncResult: true }
 });
 
 AppActions.loadSuperchargers.preEmit = function() {
