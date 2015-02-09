@@ -5,10 +5,12 @@ var AppActions = require('../actions/AppActions');
 
 var Directions = React.createClass({
 
+  onGetDirections() {
+    console.log('click')
+  },
+
   render() {
     return (
-
-
       <div className='directions-overlay'>
         <div className='directions'>
           <div className='start'>
@@ -21,7 +23,7 @@ var Directions = React.createClass({
             <i className='ion-model-s'></i>
           </div>
         </div>
-        <button className='swap'>
+        <button className='swap' onClick={this.onGetDirections}>
           <i className='ion-android-send'></i>
         </button>
         <button className='get-directions'>Type, Options, Current Charge</button>
