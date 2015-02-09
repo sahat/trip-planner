@@ -28,10 +28,23 @@ body {
   height: 100%;
 }
 
-.button {
+button {
   cursor: pointer;
   border: 1px solid transparent;
   outline: none;
+
+  &:hover,
+  &:focus {
+    color: #FFF;
+    text-decoration: none;
+  }
+
+  &:active,
+  &.active {
+    outline: 0;
+    background-image: none;
+    box-shadow: inset 0 3px 5px rgba(0,0,0,.125);
+  }
 }
 
 .status {
@@ -96,6 +109,7 @@ body {
   padding: 0 10px;
   height: 72px;
   line-height: 72px;
+  outline: none;
 }
 
 .directions-overlay .get-directions {
@@ -109,19 +123,6 @@ body {
   cursor: pointer;
   border: 1px solid transparent;
   outline: none;
-
-  &:hover,
-  &:focus {
-    color: #FFF;
-    text-decoration: none;
-  }
-
-  &:active,
-  &.active {
-    outline: 0;
-    background-image: none;
-    box-shadow: inset 0 3px 5px rgba(0,0,0,.125);
-  }
 }
 
 

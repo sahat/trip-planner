@@ -340,10 +340,17 @@ body {
 .map {
   height: 100%; }
 
-.button {
+button {
   cursor: pointer;
   border: 1px solid transparent;
   outline: none; }
+  button:hover, button:focus {
+    color: #FFF;
+    text-decoration: none; }
+  button:active, button.active {
+    outline: 0;
+    background-image: none;
+    box-shadow: inset 0 3px 5px rgba(0, 0, 0, 0.125); }
 
 .status {
   text-align: center;
@@ -399,7 +406,8 @@ body {
   background-color: #4e8ef7;
   padding: 0 10px;
   height: 72px;
-  line-height: 72px; }
+  line-height: 72px;
+  outline: none; }
 
 .directions-overlay .get-directions {
   background: #1AC567;
@@ -412,13 +420,6 @@ body {
   cursor: pointer;
   border: 1px solid transparent;
   outline: none; }
-  .directions-overlay .get-directions:hover, .directions-overlay .get-directions:focus {
-    color: #FFF;
-    text-decoration: none; }
-  .directions-overlay .get-directions:active, .directions-overlay .get-directions.active {
-    outline: 0;
-    background-image: none;
-    box-shadow: inset 0 3px 5px rgba(0, 0, 0, 0.125); }
 
 .directions-overlay hr {
   position: absolute;
