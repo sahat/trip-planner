@@ -1,35 +1,39 @@
 var React = require('react');
 var Reflux = require('reflux');
-var AppStore = require('../stores/AppStore');
-var AppActions = require('../actions/AppActions');
+var MapStore = require('../stores/MapStore');
+var MapActions = require('../actions/MapActions');
 
 var Directions = React.createClass({
 
-  mixins: [Reflux.connect(AppStore)],
+  mixins: [Reflux.connect(MapStore)],
 
-  onGetDirections() {
-    AppActions.getDirections({
+  handleSubmit() {
+    MapActions.routeDirections({
       start: this.refs.start.getDOMNode().value,
       end: this.refs.end.getDOMNode().value,
       map: this.props.map
     });
   },
 
+  handleKeyDown(event) {
+    if (event.keyCode === 13) {
+      this.handleSubmit();
+    }
+  },
+
   render() {
     return (
       <div className='directions-overlay'>
-        <div className='directions'>
-          <div className='start'>
-            <input type='text' ref='start' className='start' placeholder='Start' />
-            <i className='ion-pinpoint'></i>
-          </div>
-          <hr/>
-          <div className='start'>
-            <input type='text' ref='end' placeholder='End' />
-            <i className='ion-model-s'></i>
-          </div>
+        <div>
+          <input type='text' ref='start' placeholder='Start' onKeyDown={this.handleKeyDown} />
+          <i className='ion-pinpoint' />
         </div>
-        <button className='swap' onClick={this.onGetDirections}>
+        <hr/>
+        <div>
+          <input type='text' ref='end' placeholder='End' onKeyDown={this.handleKeyDown} />
+          <i className='ion-model-s' />
+        </div>
+        <button className='route' onClick={this.handleSubmit}>
           <i className='ion-android-send'></i>
         </button>
         <button className='get-directions'>Type, Options, Current Charge</button>
