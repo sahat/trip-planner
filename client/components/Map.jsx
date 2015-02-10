@@ -1,36 +1,41 @@
 var React = require('react');
 var Reflux = require('reflux');
-var AppStore = require('../stores/AppStore');
-var AppActions = require('../actions/AppActions');
+var MapStore = require('../stores/MapStore');
+var MapActions = require('../actions/MapActions');
 var Directions = require('./Directions.jsx');
 
 var Maps = React.createClass({
 
-  mixins: [Reflux.connect(AppStore)],
+  mixins: [Reflux.listenTo(MapStore, 'onStoreChange')],
 
-  propTypes: {
-    zoom: React.PropTypes.number
+  onStoreChange(data) {
+    if (data.superchargers) {
+      this.setState({ superchargers: data.superchargers });
+      this.setSuperchargerMarkers();
+    }
+
+    if (data.currentPosition) {
+      this.setState({ currentPosition: data.currentPosition });
+      this.centerCurrentPosition();
+    }
   },
 
   getInitialState() {
+    console.log('calling initial state');
     return {
-      superchargers: [],
-      currentPosition: { latitude: 33.92142, longitude: -118.32982 }
+      map: null
     }
   },
 
   componentDidMount() {
-    AppActions.getCurrentPosition();
-    AppActions.loadSuperchargers();
+    MapActions.getCurrentPosition();
+    MapActions.getSuperchargers();
 
     var mapOptions = {
-      center: { lat: this.state.currentPosition.latitude, lng: this.state.currentPosition.longitude },
-      zoom: this.props.zoom,
+      center: { lat: 39, lng: -101 },
+      zoom: 4,
       disableDefaultUI: true,
       zoomControl: true,
-      zoomControlOptions: {
-        style: google.maps.ZoomControlStyle.SMALL
-      },
       scaleControl: true
     };
 
@@ -39,30 +44,7 @@ var Maps = React.createClass({
     this.setState({ map: map });
   },
 
-  componentWillUpdate(nextProps, nextState) {
-    if (nextState.currentPosition !== this.state.currentPosition) {
-      console.log(nextState.currentPosition)
-      this.state.map.setCenter({
-        lat: nextState.currentPosition.latitude,
-        lng: nextState.currentPosition.longitude
-      });
-
-      console.log(nextState.currentPosition);
-
-
-      for (var sc of this.state.superchargers) {
-        var d = this.calculateDistance(nextState.currentPosition, sc);
-        console.log("Distance is ", d, sc.location);
-      }
-    }
-
-    if (this.state.superchargers.length > 0) {
-      this.setSuperchargerMarkers(this.state.map);
-    }
-
-  },
-
-  setSuperchargerMarkers(map) {
+  setSuperchargerMarkers() {
     for (var sc of this.state.superchargers) {
       var marker = new google.maps.Marker({
         position: new google.maps.LatLng(sc.latitude, sc.longitude),
@@ -70,11 +52,20 @@ var Maps = React.createClass({
           url: '../img/icon-supercharger@2x.png',
           scaledSize: new google.maps.Size(23, 33)
         },
-        map: map,
+        map: this.state.map,
         title: sc.location,
         animation: google.maps.Animation.DROP
       });
     }
+  },
+
+  centerCurrentPosition() {
+    var latitude = this.state.currentPosition.latitude;
+    var longitude = this.state.currentPosition.longitude;
+    var map = this.state.map;
+
+    map.setCenter(new google.maps.LatLng(latitude, longitude));
+    map.setZoom(10);
   },
 
   calculateDistance(start, end) {
@@ -102,6 +93,12 @@ var Maps = React.createClass({
     var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
     return R * c;
+
+    //for (var sc of this.state.superchargers) {
+//  var d = this.calculateDistance(nextState.currentPosition, sc);
+//  console.log("Distance is ", d, sc.location);
+//}
+
   },
 
   render() {
@@ -114,5 +111,9 @@ var Maps = React.createClass({
   }
 
 });
+
+
+
+
 
 module.exports = Maps;
