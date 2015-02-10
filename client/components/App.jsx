@@ -1,7 +1,6 @@
 var React = require('react');
 var Reflux = require('reflux');
-var Maps = require('./Maps.jsx');
-var Directions = require('./Directions.jsx');
+var Map = require('./Map.jsx');
 
 var App = React.createClass({
 
@@ -10,12 +9,13 @@ var App = React.createClass({
       <div id='container'>
         <nav>
           <ul>
-            <li><a href=''>Options</a></li>
             <li><a href=''>Feedback</a></li>
+            <li><a href=''>Options</a></li>
             <li><a href=''>Login</a></li>
+            <li><a href=''>Register</a></li>
           </ul>
         </nav>
-        <Maps zoom={10} />
+        <Map />
       </div>
     );
   }
