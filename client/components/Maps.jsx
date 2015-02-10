@@ -9,15 +9,13 @@ var Maps = React.createClass({
   mixins: [Reflux.connect(AppStore)],
 
   propTypes: {
-    currentPosition: React.PropTypes.object,
-    superchargers: React.PropTypes.array,
     zoom: React.PropTypes.number
   },
 
   getInitialState() {
     return {
       superchargers: [],
-      currentPosition: { lat: 33.92142, lng: -118.32982 }
+      currentPosition: { latitude: 33.92142, longitude: -118.32982 }
     }
   },
 
@@ -26,7 +24,7 @@ var Maps = React.createClass({
     AppActions.loadSuperchargers();
 
     var mapOptions = {
-      center: this.state.currentPosition,
+      center: { lat: this.state.currentPosition.latitude, lng: this.state.currentPosition.longitude },
       zoom: this.props.zoom,
       disableDefaultUI: true,
       zoomControl: true,
@@ -43,12 +41,25 @@ var Maps = React.createClass({
 
   componentWillUpdate(nextProps, nextState) {
     if (nextState.currentPosition !== this.state.currentPosition) {
-      this.state.map.setCenter(nextState.currentPosition);
+      console.log(nextState.currentPosition)
+      this.state.map.setCenter({
+        lat: nextState.currentPosition.latitude,
+        lng: nextState.currentPosition.longitude
+      });
+
+      console.log(nextState.currentPosition);
+
+
+      for (var sc of this.state.superchargers) {
+        var d = this.calculateDistance(nextState.currentPosition, sc);
+        console.log("Distance is ", d, sc.location);
+      }
     }
 
     if (this.state.superchargers.length > 0) {
       this.setSuperchargerMarkers(this.state.map);
     }
+
   },
 
   setSuperchargerMarkers(map) {
@@ -64,6 +75,33 @@ var Maps = React.createClass({
         animation: google.maps.Animation.DROP
       });
     }
+  },
+
+  calculateDistance(start, end) {
+    /**
+     * Calculates the distance between Latitude/Longitude points using
+     * Harvesine formula.
+     *
+     * a = sin²(Δφ/2)+cos(φ1)⋅cos(φ2)⋅sin²(Δλ/2)
+     * c = 2⋅atan2(√a,√(1−a))
+     * d = R⋅c
+     */
+
+    Number.prototype.toRad = function() {
+      return this * Math.PI / 180;
+    };
+
+    var R = 6371;
+    var dLat = (end.latitude - start.latitude).toRad();
+    var dLon = (end.longitude - start.longitude).toRad();
+    var lat1 = start.latitude.toRad();
+    var lat2 = end.latitude.toRad();
+
+    var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.sin(dLon / 2) * Math.sin(dLon / 2) * Math.cos(lat1) * Math.cos(lat2);
+    var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    return R * c;
   },
 
   render() {
