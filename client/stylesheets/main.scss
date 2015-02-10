@@ -90,14 +90,13 @@ button {
   transition: all 0.2s cubic-bezier(0.52, 0, 0.48, 1);
 }
 
-.directions-overlay .start i,
-.directions-overlay .end i {
+.directions-overlay input + i {
   position: absolute;
   padding-left: 10px;
   margin-top: -27px;
 }
 
-.directions-overlay .swap {
+.directions-overlay .route {
   cursor: pointer;
   position: absolute;
   right: 0;
@@ -113,7 +112,7 @@ button {
 }
 
 .directions-overlay .get-directions {
-  background: #1AC567;
+  background: lightgray;
   font-weight: bold;
   font-size: 12px;
   position: absolute;
