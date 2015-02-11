@@ -24,7 +24,17 @@ var React = require('react');
 var Reflux = require('reflux');
 var Map = require('./Map.jsx');
 
+var EPA = {
+  '60': 208,
+  '85': 265,
+  '85D': 270,
+  'P85D': 253
+};
+
 var App = React.createClass({displayName: "App",
+
+  //getInitialState() {
+  //},
 
   render:function() {
     return (
@@ -56,7 +66,40 @@ var Directions = React.createClass({displayName: "Directions",
 
   mixins: [Reflux.connect(MapStore)],
 
+  componentDidMount:function() {
+    var start = new google.maps.places.Autocomplete(this.refs.start.getDOMNode());
+    var end = new google.maps.places.Autocomplete(this.refs.end.getDOMNode());
+    this.setState({ start: start, end: end });
+  },
+
+  componentDidUpdate:function() {
+    if (this.state.currentPosition) {
+      this.geolocateAutocomplete();
+    }
+  },
+
+  geolocateAutocomplete:function() {
+    var latitude = this.state.currentPosition.latitude;
+    var longitude = this.state.currentPosition.longitude;
+    var accuracy = this.state.currentPosition.accuracy;
+
+    var geolocation = new google.maps.LatLng(latitude, longitude);
+    var circle = new google.maps.Circle({
+      center: geolocation,
+      radius: accuracy
+    });
+
+    this.state.start.setBounds(circle.getBounds());
+    this.state.end.setBounds(circle.getBounds());
+  },
+
   handleSubmit:function() {
+    var start = this.refs.start.getDOMNode();
+    var end = this.refs.end.getDOMNode();
+
+    if (!start.value) { return start.focus(); }
+    if (!end.value) { return end.focus(); }
+
     MapActions.routeDirections({
       start: this.refs.start.getDOMNode().value,
       end: this.refs.end.getDOMNode().value,
@@ -90,12 +133,25 @@ var Directions = React.createClass({displayName: "Directions",
         React.createElement("hr", null), 
         React.createElement("div", null, 
           React.createElement("input", {type: "text", ref: "end", placeholder: "End", onKeyDown: this.handleKeyDown}), 
-          React.createElement("i", {className: "ion-model-s"})
+          React.createElement("i", {className: "ion-log-in"})
         ), 
         React.createElement("button", {className: "route", onClick: this.handleSubmit}, 
           React.createElement("i", {className: "ion-android-send"})
         ), 
-        React.createElement("button", {className: "get-directions"}, "Type, Options, Current Charge")
+        React.createElement("div", {className: "button-group"}, 
+          React.createElement("button", {className: "model"}, 
+            React.createElement("i", {className: "ion-model-s"}), 
+            "Model"), 
+          React.createElement("button", {className: "configuration"}, 
+            React.createElement("i", {className: "ion-gear-a"}), 
+            "Configuration"), 
+          React.createElement("button", {className: "charge"}, 
+            React.createElement("i", {className: "ion-battery-charging"}), 
+            "Charge"), 
+          React.createElement("button", {className: "options"}, 
+            React.createElement("i", {className: "ion-android-options"}), 
+            "Other")
+        )
       )
     );
   }
@@ -141,9 +197,7 @@ var Maps = React.createClass({displayName: "Maps",
     var mapOptions = {
       center: { lat: 39, lng: -101 },
       zoom: 4,
-      disableDefaultUI: true,
-      zoomControl: true,
-      scaleControl: true
+      disableDefaultUI: true
     };
 
     var map = new google.maps.Map(this.refs.map.getDOMNode(), mapOptions);
@@ -227,7 +281,9 @@ var Maps = React.createClass({displayName: "Maps",
   render:function() {
     return (
       React.createElement("div", {className: "map"}, 
-        React.createElement(Directions, {map: this.state.map}), 
+        React.createElement(Directions, {
+          map: this.state.map, 
+          currentPosition: this.state.currentPosition}), 
         React.createElement("div", {className: "map", ref: "map"})
       )
     );

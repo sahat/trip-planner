@@ -7,19 +7,22 @@ var Directions = React.createClass({
 
   mixins: [Reflux.connect(MapStore)],
 
+  componentDidMount() {
+    var start = new google.maps.places.Autocomplete(this.refs.start.getDOMNode());
+    var end = new google.maps.places.Autocomplete(this.refs.end.getDOMNode());
+    this.setState({ start: start, end: end });
+  },
+
   componentDidUpdate() {
     if (this.state.currentPosition) {
-      this.initializePlacesAutocomplete();
+      this.geolocateAutocomplete();
     }
   },
 
-  initializePlacesAutocomplete() {
+  geolocateAutocomplete() {
     var latitude = this.state.currentPosition.latitude;
     var longitude = this.state.currentPosition.longitude;
     var accuracy = this.state.currentPosition.accuracy;
-
-    var start = new google.maps.places.Autocomplete(this.refs.start.getDOMNode());
-    var end = new google.maps.places.Autocomplete(this.refs.end.getDOMNode());
 
     var geolocation = new google.maps.LatLng(latitude, longitude);
     var circle = new google.maps.Circle({
@@ -27,11 +30,17 @@ var Directions = React.createClass({
       radius: accuracy
     });
 
-    start.setBounds(circle.getBounds());
-    end.setBounds(circle.getBounds());
+    this.state.start.setBounds(circle.getBounds());
+    this.state.end.setBounds(circle.getBounds());
   },
 
   handleSubmit() {
+    var start = this.refs.start.getDOMNode();
+    var end = this.refs.end.getDOMNode();
+
+    if (!start.value) { return start.focus(); }
+    if (!end.value) { return end.focus(); }
+
     MapActions.routeDirections({
       start: this.refs.start.getDOMNode().value,
       end: this.refs.end.getDOMNode().value,
