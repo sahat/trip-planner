@@ -120,7 +120,9 @@ var Maps = React.createClass({
   render() {
     return (
       <div className='map'>
-        <Directions map={this.state.map} />
+        <Directions
+          map={this.state.map}
+          currentPosition={this.state.currentPosition} />
         <div className='map' ref='map'></div>
       </div>
     );
