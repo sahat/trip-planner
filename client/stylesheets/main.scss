@@ -116,6 +116,10 @@ button {
 
 }
 
+.directions-overlay .button-group [class^="ion-"] {
+  margin-right: 5px;
+}
+
 .directions-overlay .model:hover {
   background-color: rgba(204, 0, 0, 0.7);
 }
