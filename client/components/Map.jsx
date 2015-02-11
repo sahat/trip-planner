@@ -44,6 +44,27 @@ var Maps = React.createClass({
     this.setState({ map: map });
   },
 
+  componentDidUpdate() {
+    if (this.state.superchargers && this.state.currentPosition) {
+      var superchargerDistances = [];
+
+      for (var sc of this.state.superchargers) {
+        var d = this.calculateDistance(this.state.currentPosition, sc);
+        console.log("Distance is ", d, sc.location);
+        superchargerDistances.push({ supercharger: sc, distance: d });
+      }
+
+      var sortedSuperchargers = superchargerDistances.sort(function(a, b) {
+        return a.distance - b.distance;
+      });
+
+
+      console.log(sortedSuperchargers);
+
+
+    }
+  },
+
   setSuperchargerMarkers() {
     for (var sc of this.state.superchargers) {
       var marker = new google.maps.Marker({
@@ -93,11 +114,6 @@ var Maps = React.createClass({
     var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
     return R * c;
-
-    //for (var sc of this.state.superchargers) {
-//  var d = this.calculateDistance(nextState.currentPosition, sc);
-//  console.log("Distance is ", d, sc.location);
-//}
 
   },
 

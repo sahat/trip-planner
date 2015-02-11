@@ -4,27 +4,25 @@ var App = require('./components/App.jsx');
 
 React.render(React.createElement(App, null), document.body);
 
-},{"./components/App.jsx":"/Users/sahat/Projects/trip-planner/client/components/App.jsx","react":"/Users/sahat/Projects/trip-planner/node_modules/react/react.js"}],"/Users/sahat/Projects/trip-planner/client/actions/AppActions.js":[function(require,module,exports){
+},{"./components/App.jsx":"/Users/sahat/Projects/trip-planner/client/components/App.jsx","react":"/Users/sahat/Projects/trip-planner/node_modules/react/react.js"}],"/Users/sahat/Projects/trip-planner/client/actions/MapActions.js":[function(require,module,exports){
 var Reflux = require('reflux');
-var request = require('superagent');
 
-var AppActions = Reflux.createActions({
-  loadSuperchargers: { asyncResult: true },
-  getCurrentPosition: { asyncResult: true },
-  getDirections: { asyncResult: true }
-});
+var MapActions = Reflux.createActions([
+  'routeDirections',
+  'getCurrentPosition',
+  'getSuperchargers'
+]);
 
-AppActions.loadSuperchargers.preEmit = function() {
+MapActions.getSuperchargers.preEmit = function() {
   console.log('fired sc fetch action')
 };
 
-module.exports = AppActions;
+module.exports = MapActions;
 
-},{"reflux":"/Users/sahat/Projects/trip-planner/node_modules/reflux/index.js","superagent":"/Users/sahat/Projects/trip-planner/node_modules/superagent/lib/client.js"}],"/Users/sahat/Projects/trip-planner/client/components/App.jsx":[function(require,module,exports){
+},{"reflux":"/Users/sahat/Projects/trip-planner/node_modules/reflux/index.js"}],"/Users/sahat/Projects/trip-planner/client/components/App.jsx":[function(require,module,exports){
 var React = require('react');
 var Reflux = require('reflux');
-var Maps = require('./Maps.jsx');
-var Directions = require('./Directions.jsx');
+var Map = require('./Map.jsx');
 
 var App = React.createClass({displayName: "App",
 
@@ -33,12 +31,13 @@ var App = React.createClass({displayName: "App",
       React.createElement("div", {id: "container"}, 
         React.createElement("nav", null, 
           React.createElement("ul", null, 
-            React.createElement("li", null, React.createElement("a", {href: ""}, "Options")), 
             React.createElement("li", null, React.createElement("a", {href: ""}, "Feedback")), 
-            React.createElement("li", null, React.createElement("a", {href: ""}, "Login"))
+            React.createElement("li", null, React.createElement("a", {href: ""}, "Options")), 
+            React.createElement("li", null, React.createElement("a", {href: ""}, "Login")), 
+            React.createElement("li", null, React.createElement("a", {href: ""}, "Register"))
           )
         ), 
-        React.createElement(Maps, {zoom: 10})
+        React.createElement(Map, null)
       )
     );
   }
@@ -47,39 +46,53 @@ var App = React.createClass({displayName: "App",
 
 module.exports = App;
 
-},{"./Directions.jsx":"/Users/sahat/Projects/trip-planner/client/components/Directions.jsx","./Maps.jsx":"/Users/sahat/Projects/trip-planner/client/components/Maps.jsx","react":"/Users/sahat/Projects/trip-planner/node_modules/react/react.js","reflux":"/Users/sahat/Projects/trip-planner/node_modules/reflux/index.js"}],"/Users/sahat/Projects/trip-planner/client/components/Directions.jsx":[function(require,module,exports){
+},{"./Map.jsx":"/Users/sahat/Projects/trip-planner/client/components/Map.jsx","react":"/Users/sahat/Projects/trip-planner/node_modules/react/react.js","reflux":"/Users/sahat/Projects/trip-planner/node_modules/reflux/index.js"}],"/Users/sahat/Projects/trip-planner/client/components/Directions.jsx":[function(require,module,exports){
 var React = require('react');
 var Reflux = require('reflux');
-var AppStore = require('../stores/AppStore');
-var AppActions = require('../actions/AppActions');
+var MapStore = require('../stores/MapStore');
+var MapActions = require('../actions/MapActions');
 
 var Directions = React.createClass({displayName: "Directions",
 
-  mixins: [Reflux.connect(AppStore)],
+  mixins: [Reflux.connect(MapStore)],
 
-  onGetDirections:function() {
-    AppActions.getDirections({
+  handleSubmit:function() {
+    MapActions.routeDirections({
       start: this.refs.start.getDOMNode().value,
       end: this.refs.end.getDOMNode().value,
       map: this.props.map
     });
   },
 
+  handleKeyDown:function(event) {
+    if (event.keyCode === 13) {
+      this.handleSubmit();
+    }
+  },
+
+
+//<ButtonGroup>
+//  <Button>1</Button>
+//  <Button>2</Button>
+//  <DropdownButton title="Dropdown">
+//    <MenuItem eventKey="1">Dropdown link</MenuItem>
+//    <MenuItem eventKey="2">Dropdown link</MenuItem>
+//  </DropdownButton>
+//</ButtonGroup>
+
   render:function() {
     return (
       React.createElement("div", {className: "directions-overlay"}, 
-        React.createElement("div", {className: "directions"}, 
-          React.createElement("div", {className: "start"}, 
-            React.createElement("input", {type: "text", ref: "start", className: "start", placeholder: "Start"}), 
-            React.createElement("i", {className: "ion-pinpoint"})
-          ), 
-          React.createElement("hr", null), 
-          React.createElement("div", {className: "start"}, 
-            React.createElement("input", {type: "text", ref: "end", placeholder: "End"}), 
-            React.createElement("i", {className: "ion-model-s"})
-          )
+        React.createElement("div", null, 
+          React.createElement("input", {type: "text", ref: "start", placeholder: "Start", autoFocus: true, onKeyDown: this.handleKeyDown}), 
+          React.createElement("i", {className: "ion-pinpoint"})
         ), 
-        React.createElement("button", {className: "swap", onClick: this.onGetDirections}, 
+        React.createElement("hr", null), 
+        React.createElement("div", null, 
+          React.createElement("input", {type: "text", ref: "end", placeholder: "End", onKeyDown: this.handleKeyDown}), 
+          React.createElement("i", {className: "ion-model-s"})
+        ), 
+        React.createElement("button", {className: "route", onClick: this.handleSubmit}, 
           React.createElement("i", {className: "ion-android-send"})
         ), 
         React.createElement("button", {className: "get-directions"}, "Type, Options, Current Charge")
@@ -91,42 +104,45 @@ var Directions = React.createClass({displayName: "Directions",
 
 module.exports = Directions;
 
-},{"../actions/AppActions":"/Users/sahat/Projects/trip-planner/client/actions/AppActions.js","../stores/AppStore":"/Users/sahat/Projects/trip-planner/client/stores/AppStore.js","react":"/Users/sahat/Projects/trip-planner/node_modules/react/react.js","reflux":"/Users/sahat/Projects/trip-planner/node_modules/reflux/index.js"}],"/Users/sahat/Projects/trip-planner/client/components/Maps.jsx":[function(require,module,exports){
+},{"../actions/MapActions":"/Users/sahat/Projects/trip-planner/client/actions/MapActions.js","../stores/MapStore":"/Users/sahat/Projects/trip-planner/client/stores/MapStore.js","react":"/Users/sahat/Projects/trip-planner/node_modules/react/react.js","reflux":"/Users/sahat/Projects/trip-planner/node_modules/reflux/index.js"}],"/Users/sahat/Projects/trip-planner/client/components/Map.jsx":[function(require,module,exports){
 var React = require('react');
 var Reflux = require('reflux');
-var AppStore = require('../stores/AppStore');
-var AppActions = require('../actions/AppActions');
+var MapStore = require('../stores/MapStore');
+var MapActions = require('../actions/MapActions');
 var Directions = require('./Directions.jsx');
 
 var Maps = React.createClass({displayName: "Maps",
 
-  mixins: [Reflux.connect(AppStore)],
+  mixins: [Reflux.listenTo(MapStore, 'onStoreChange')],
 
-  propTypes: {
-    currentPosition: React.PropTypes.object,
-    superchargers: React.PropTypes.array,
-    zoom: React.PropTypes.number
+  onStoreChange:function(data) {
+    if (data.superchargers) {
+      this.setState({ superchargers: data.superchargers });
+      this.setSuperchargerMarkers();
+    }
+
+    if (data.currentPosition) {
+      this.setState({ currentPosition: data.currentPosition });
+      this.centerCurrentPosition();
+    }
   },
 
   getInitialState:function() {
+    console.log('calling initial state');
     return {
-      superchargers: [],
-      currentPosition: { lat: 33.92142, lng: -118.32982 }
+      map: null
     }
   },
 
   componentDidMount:function() {
-    AppActions.getCurrentPosition();
-    AppActions.loadSuperchargers();
+    MapActions.getCurrentPosition();
+    MapActions.getSuperchargers();
 
     var mapOptions = {
-      center: this.state.currentPosition,
-      zoom: this.props.zoom,
+      center: { lat: 39, lng: -101 },
+      zoom: 4,
       disableDefaultUI: true,
       zoomControl: true,
-      zoomControlOptions: {
-        style: google.maps.ZoomControlStyle.SMALL
-      },
       scaleControl: true
     };
 
@@ -135,17 +151,28 @@ var Maps = React.createClass({displayName: "Maps",
     this.setState({ map: map });
   },
 
-  componentWillUpdate:function(nextProps, nextState) {
-    if (nextState.currentPosition !== this.state.currentPosition) {
-      this.state.map.setCenter(nextState.currentPosition);
-    }
+  componentDidUpdate:function() {
+    if (this.state.superchargers && this.state.currentPosition) {
+      var superchargerDistances = [];
 
-    if (this.state.superchargers.length > 0) {
-      this.setSuperchargerMarkers(this.state.map);
+      for (var sc of this.state.superchargers) {
+        var d = this.calculateDistance(this.state.currentPosition, sc);
+        console.log("Distance is ", d, sc.location);
+        superchargerDistances.push({ supercharger: sc, distance: d });
+      }
+
+      var sortedSuperchargers = superchargerDistances.sort(function(a, b) {
+        return a.distance - b.distance;
+      });
+
+
+      console.log(sortedSuperchargers);
+
+
     }
   },
 
-  setSuperchargerMarkers:function(map) {
+  setSuperchargerMarkers:function() {
     for (var sc of this.state.superchargers) {
       var marker = new google.maps.Marker({
         position: new google.maps.LatLng(sc.latitude, sc.longitude),
@@ -153,11 +180,48 @@ var Maps = React.createClass({displayName: "Maps",
           url: '../img/icon-supercharger@2x.png',
           scaledSize: new google.maps.Size(23, 33)
         },
-        map: map,
+        map: this.state.map,
         title: sc.location,
         animation: google.maps.Animation.DROP
       });
     }
+  },
+
+  centerCurrentPosition:function() {
+    var latitude = this.state.currentPosition.latitude;
+    var longitude = this.state.currentPosition.longitude;
+    var map = this.state.map;
+
+    map.setCenter(new google.maps.LatLng(latitude, longitude));
+    map.setZoom(10);
+  },
+
+  calculateDistance:function(start, end) {
+    /**
+     * Calculates the distance between Latitude/Longitude points using
+     * Harvesine formula.
+     *
+     * a = sin²(Δφ/2)+cos(φ1)⋅cos(φ2)⋅sin²(Δλ/2)
+     * c = 2⋅atan2(√a,√(1−a))
+     * d = R⋅c
+     */
+
+    Number.prototype.toRad = function() {
+      return this * Math.PI / 180;
+    };
+
+    var R = 6371;
+    var dLat = (end.latitude - start.latitude).toRad();
+    var dLon = (end.longitude - start.longitude).toRad();
+    var lat1 = start.latitude.toRad();
+    var lat2 = end.latitude.toRad();
+
+    var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.sin(dLon / 2) * Math.sin(dLon / 2) * Math.cos(lat1) * Math.cos(lat2);
+    var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    return R * c;
+
   },
 
   render:function() {
@@ -171,69 +235,59 @@ var Maps = React.createClass({displayName: "Maps",
 
 });
 
+
+
+
+
 module.exports = Maps;
 
-},{"../actions/AppActions":"/Users/sahat/Projects/trip-planner/client/actions/AppActions.js","../stores/AppStore":"/Users/sahat/Projects/trip-planner/client/stores/AppStore.js","./Directions.jsx":"/Users/sahat/Projects/trip-planner/client/components/Directions.jsx","react":"/Users/sahat/Projects/trip-planner/node_modules/react/react.js","reflux":"/Users/sahat/Projects/trip-planner/node_modules/reflux/index.js"}],"/Users/sahat/Projects/trip-planner/client/stores/AppStore.js":[function(require,module,exports){
+},{"../actions/MapActions":"/Users/sahat/Projects/trip-planner/client/actions/MapActions.js","../stores/MapStore":"/Users/sahat/Projects/trip-planner/client/stores/MapStore.js","./Directions.jsx":"/Users/sahat/Projects/trip-planner/client/components/Directions.jsx","react":"/Users/sahat/Projects/trip-planner/node_modules/react/react.js","reflux":"/Users/sahat/Projects/trip-planner/node_modules/reflux/index.js"}],"/Users/sahat/Projects/trip-planner/client/stores/MapStore.js":[function(require,module,exports){
 var request = require('superagent');
 var Reflux = require('reflux');
-var AppActions = require('../actions/AppActions');
-
-var map;
+var MapActions = require('../actions/MapActions');
 
 var AppStore = Reflux.createStore({
 
-  listenables: AppActions,
+  listenables: MapActions,
 
-  getMapInstance:function() {
-    console.log(' getting map' , map);
-    return map;
-  },
-
-  saveMapInstance:function(newMap) {
-    console.log('saving map');
-    map = newMap;
-  },
-
-  loadSuperchargers:function() {
+  getSuperchargers:function() {
     request.get('http://localhost:5000/superchargers', function(res) {
       var superchargers = JSON.parse(res.text);
       this.trigger({ superchargers: superchargers });
     }.bind(this));
   },
 
-  getDirections:function(data) {
+  getCurrentPosition:function() {
+    navigator.geolocation.getCurrentPosition(function(position) {
+      this.trigger({ currentPosition: position.coords });
+    }.bind(this));
+  },
+
+  routeDirections:function(params) {
     var directionsService = new google.maps.DirectionsService();
     var directionsDisplay = new google.maps.DirectionsRenderer();
 
-    directionsDisplay.setMap(data.map);
+    directionsDisplay.setMap(params.map);
 
     var request = {
-      origin: data.start,
-      destination: data.end,
+      origin: params.start,
+      destination: params.end,
       travelMode: google.maps.TravelMode.DRIVING
     };
 
     directionsService.route(request, function(result, status) {
       if (status == google.maps.DirectionsStatus.OK) {
+        console.log(result);
         directionsDisplay.setDirections(result);
       }
     }.bind(this));
-  },
-
-  getCurrentPosition:function() {
-    navigator.geolocation.getCurrentPosition(function(position) {
-      var pos = {
-        lat: position.coords.latitude,
-        lng: position.coords.longitude
-      };
-      this.trigger({ currentPosition: pos });
-    }.bind(this));
   }
+
 });
 
 module.exports = AppStore;
 
-},{"../actions/AppActions":"/Users/sahat/Projects/trip-planner/client/actions/AppActions.js","reflux":"/Users/sahat/Projects/trip-planner/node_modules/reflux/index.js","superagent":"/Users/sahat/Projects/trip-planner/node_modules/superagent/lib/client.js"}],"/Users/sahat/Projects/trip-planner/node_modules/browserify/node_modules/process/browser.js":[function(require,module,exports){
+},{"../actions/MapActions":"/Users/sahat/Projects/trip-planner/client/actions/MapActions.js","reflux":"/Users/sahat/Projects/trip-planner/node_modules/reflux/index.js","superagent":"/Users/sahat/Projects/trip-planner/node_modules/superagent/lib/client.js"}],"/Users/sahat/Projects/trip-planner/node_modules/browserify/node_modules/process/browser.js":[function(require,module,exports){
 // shim for using process in browser
 
 var process = module.exports = {};
