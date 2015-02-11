@@ -369,13 +369,13 @@ button {
 .directions-overlay {
   position: absolute;
   top: 15px;
-  left: 50px;
+  left: 15px;
   z-index: 1;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3), 0 4px 15px -5px transparent; }
 
 .directions-overlay input {
   display: block;
-  min-width: 285px;
+  min-width: 272px;
   padding: 3px 10px 3px 35px;
   font-size: 14px;
   line-height: 30px;
@@ -407,26 +407,25 @@ button {
   outline: none; }
 
 .directions-overlay .button-group button {
-  padding: 4px 8px;
+  padding: 3px 9px;
   font-weight: 600;
   color: #fff;
-  background-color: rgba(0, 0, 0, 0.1);
   transition: all 0.2s cubic-bezier(0.52, 0, 0.48, 1); }
 
 .directions-overlay .button-group [class^="ion-"] {
   margin-right: 5px; }
 
-.directions-overlay .model:hover {
-  background-color: rgba(204, 0, 0, 0.7); }
+.directions-overlay .model {
+  background-color: rgba(204, 0, 0, 0.75); }
 
-.directions-overlay .configuration:hover {
-  background-color: rgba(51, 51, 51, 0.7); }
+.directions-overlay .configuration {
+  background-color: rgba(51, 51, 51, 0.75); }
 
-.directions-overlay .charge:hover {
-  background-color: rgba(46, 204, 64, 0.7); }
+.directions-overlay .charge {
+  background-color: rgba(46, 204, 64, 0.75); }
 
-.directions-overlay .options:hover {
-  background-color: rgba(72, 61, 139, 0.7); }
+.directions-overlay .options {
+  background-color: rgba(72, 61, 139, 0.75); }
 
 .directions-overlay hr {
   position: absolute;
