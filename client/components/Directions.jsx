@@ -21,11 +21,21 @@ var Directions = React.createClass({
     }
   },
 
+
+//<ButtonGroup>
+//  <Button>1</Button>
+//  <Button>2</Button>
+//  <DropdownButton title="Dropdown">
+//    <MenuItem eventKey="1">Dropdown link</MenuItem>
+//    <MenuItem eventKey="2">Dropdown link</MenuItem>
+//  </DropdownButton>
+//</ButtonGroup>
+
   render() {
     return (
       <div className='directions-overlay'>
         <div>
-          <input type='text' ref='start' placeholder='Start' onKeyDown={this.handleKeyDown} />
+          <input type='text' ref='start' placeholder='Start' autoFocus onKeyDown={this.handleKeyDown} />
           <i className='ion-pinpoint' />
         </div>
         <hr/>
