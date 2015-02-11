@@ -7,6 +7,30 @@ var Directions = React.createClass({
 
   mixins: [Reflux.connect(MapStore)],
 
+  componentDidUpdate() {
+    if (this.state.currentPosition) {
+      this.initializePlacesAutocomplete();
+    }
+  },
+
+  initializePlacesAutocomplete() {
+    var latitude = this.state.currentPosition.latitude;
+    var longitude = this.state.currentPosition.longitude;
+    var accuracy = this.state.currentPosition.accuracy;
+
+    var start = new google.maps.places.Autocomplete(this.refs.start.getDOMNode());
+    var end = new google.maps.places.Autocomplete(this.refs.end.getDOMNode());
+
+    var geolocation = new google.maps.LatLng(latitude, longitude);
+    var circle = new google.maps.Circle({
+      center: geolocation,
+      radius: accuracy
+    });
+
+    start.setBounds(circle.getBounds());
+    end.setBounds(circle.getBounds());
+  },
+
   handleSubmit() {
     MapActions.routeDirections({
       start: this.refs.start.getDOMNode().value,
@@ -41,12 +65,25 @@ var Directions = React.createClass({
         <hr/>
         <div>
           <input type='text' ref='end' placeholder='End' onKeyDown={this.handleKeyDown} />
-          <i className='ion-model-s' />
+          <i className='ion-log-in' />
         </div>
         <button className='route' onClick={this.handleSubmit}>
           <i className='ion-android-send'></i>
         </button>
-        <button className='get-directions'>Type, Options, Current Charge</button>
+        <div className='button-group'>
+          <button className='model'>
+            <i className='ion-model-s' />
+            Model</button>
+          <button className='configuration'>
+            <i className='ion-gear-a' />
+            Configuration</button>
+          <button className='charge'>
+            <i className='ion-battery-charging' />
+            Charge</button>
+          <button className='options'>
+            <i className='ion-android-options' />
+            Other</button>
+        </div>
       </div>
     );
   }
