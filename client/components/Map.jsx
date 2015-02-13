@@ -89,7 +89,7 @@ var Maps = React.createClass({
 
   calculateDistance(start, end) {
     /**
-     * Calculates the distance between Latitude/Longitude points using
+     * Calculates the distance between two Latitude/Longitude points using the
      * Harvesine formula.
      *
      * a = sin²(Δφ/2)+cos(φ1)⋅cos(φ2)⋅sin²(Δλ/2)
@@ -120,6 +120,7 @@ var Maps = React.createClass({
       <div className='map'>
         <Directions
           map={this.state.map}
+          superchargers={this.state.superchargers}
           currentPosition={this.state.currentPosition} />
         <div className='map' ref='map'></div>
       </div>
