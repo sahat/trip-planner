@@ -31,10 +31,25 @@ var AppStore = Reflux.createStore({
       travelMode: google.maps.TravelMode.DRIVING
     };
 
+    // TODO: Handle error status
+    // TODO: Underscore's _.first
     directionsService.route(request, function(result, status) {
-      if (status == google.maps.DirectionsStatus.OK) {
+      if (status === google.maps.DirectionsStatus.OK) {
         console.log(result);
         directionsDisplay.setDirections(result);
+        this.trigger({ route: result.routes[0] });
+
+        var route = result.routes[0];
+
+        var distanceInMiles = route.legs[0].distance.value / 1609.344;
+        if (distanceInMiles > 265) {
+          console.log('wont make there');
+
+          for (var segment of route.overview_path) {
+            console.log('Found SC within 50 mile radius');
+          }
+
+        }
       }
     }.bind(this));
   }

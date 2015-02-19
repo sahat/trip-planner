@@ -72,10 +72,72 @@ var Directions = React.createClass({displayName: "Directions",
     this.setState({ start: start, end: end });
   },
 
+
+  // TODO: Display info box with how long is the trip, how many miles
+  // TODO: If not enough, recommend "You can stop at the following SCs along the route"
+  // TODO: Calculate elevation along the route: blue:normal, red:hill, green:down
+  // TODO: Prefill current location for Start tagsinput.js style
+  // TODO: EvTripPlanner steps generation and reverse engineer
+
   componentDidUpdate:function() {
+    // TODO: should be props
     if (this.state.currentPosition) {
       this.geolocateAutocomplete();
     }
+
+    if (this.state.route) {
+      console.log('got route', this.state.route);
+      var route = this.state.route;
+      var distanceInMiles = route.legs[0].distance.value / 1609.344;
+      if (distanceInMiles > 265) {
+        console.log('wont make there');
+
+        var scStops = [];
+        for (var segment of route.overview_path) {
+         for (var sc of this.state.superchargers) {
+           var d = this.calculateDistance(sc, { latitude: segment.k, longitude: segment.D })
+           if (d < 25) {
+             if (scStops.indexOf(sc.location) < 0) {
+               scStops.push(sc.location);
+               console.log('Found SC within 50 mile radius');
+               console.log('Distance from current position to this segment', d);
+             }
+           }
+         }
+        }
+        console.log(scStops);
+      }
+
+
+    }
+  },
+
+  calculateDistance:function(start, end) {
+    /**
+     * Calculates the distance between two Latitude/Longitude points using the
+     * Harvesine formula.
+     *
+     * a = sin²(Δφ/2)+cos(φ1)⋅cos(φ2)⋅sin²(Δλ/2)
+     * c = 2⋅atan2(√a,√(1−a))
+     * d = R⋅c
+     */
+
+    Number.prototype.toRad = function() {
+      return this * Math.PI / 180;
+    };
+
+    var R = 6371;
+    var dLat = (end.latitude - start.latitude).toRad();
+    var dLon = (end.longitude - start.longitude).toRad();
+    var lat1 = start.latitude.toRad();
+    var lat2 = end.latitude.toRad();
+
+    var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.sin(dLon / 2) * Math.sin(dLon / 2) * Math.cos(lat1) * Math.cos(lat2);
+    var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    return R * c;
+
   },
 
   geolocateAutocomplete:function() {
@@ -252,7 +314,7 @@ var Maps = React.createClass({displayName: "Maps",
 
   calculateDistance:function(start, end) {
     /**
-     * Calculates the distance between Latitude/Longitude points using
+     * Calculates the distance between two Latitude/Longitude points using the
      * Harvesine formula.
      *
      * a = sin²(Δφ/2)+cos(φ1)⋅cos(φ2)⋅sin²(Δλ/2)
@@ -283,6 +345,7 @@ var Maps = React.createClass({displayName: "Maps",
       React.createElement("div", {className: "map"}, 
         React.createElement(Directions, {
           map: this.state.map, 
+          superchargers: this.state.superchargers, 
           currentPosition: this.state.currentPosition}), 
         React.createElement("div", {className: "map", ref: "map"})
       )
@@ -331,10 +394,25 @@ var AppStore = Reflux.createStore({
       travelMode: google.maps.TravelMode.DRIVING
     };
 
+    // TODO: Handle error status
+    // TODO: Underscore's _.first
     directionsService.route(request, function(result, status) {
-      if (status == google.maps.DirectionsStatus.OK) {
+      if (status === google.maps.DirectionsStatus.OK) {
         console.log(result);
         directionsDisplay.setDirections(result);
+        this.trigger({ route: result.routes[0] });
+
+        var route = result.routes[0];
+
+        var distanceInMiles = route.legs[0].distance.value / 1609.344;
+        if (distanceInMiles > 265) {
+          console.log('wont make there');
+
+          for (var segment of route.overview_path) {
+            console.log('Found SC within 50 mile radius');
+          }
+
+        }
       }
     }.bind(this));
   }
